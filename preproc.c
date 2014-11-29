@@ -8,6 +8,7 @@
 
 #include "preproc.h"
 #include "defs.h"
+#include "environ.h"
 #include <ctype.h>
 
 #define IncModulo(x)    ((x+1)%HSIZE)
@@ -26,19 +27,21 @@ static int cur_index = 0;
 
 char get_char()
 {
-    char ret = cur_cmd[cur_index];
+    char ret = cur_cmd[cur_index++];
 
     if( ret == 0 )
     {
         int i = 0;
+        char temp[MAX_CMD];
+
         while( 1 )
         {
             char c = getchar();
-            cur_cmd[ i++ ] = c;
+            temp[ i++ ] = c;
 
             if( c == '\n' )
             {
-                cur_cmd[i] = 0;
+                temp[i] = 0;
                 break;
             }
 
@@ -51,11 +54,20 @@ char get_char()
 
         // reset
         cur_index = 0;
-        ret = cur_cmd[cur_index];
-        add_history(cur_cmd);
+        substitute(temp, cur_cmd);
+        if(*cur_cmd == 0) // error, undefined variable found
+        {
+            ret = '\n'; // return empty line
+            //*(cur_cmd+1) = 0; // next iter => start over
+        }
+        else
+        {
+            ret = cur_cmd[cur_index++];
+            add_history(cur_cmd);
+        }
     }
 
-    cur_index++;
+
 
     return ret;
 }
@@ -122,7 +134,7 @@ char * extractVar(char * src, char * p, char * varname)
 
     if(!isValidStart(*p))
     {
-        printf("error: invalid character %c\n", *p);
+        fprintf(stderr, "error: invalid character %c\n", *p);
         return NULL;
     }
 
@@ -130,14 +142,13 @@ char * extractVar(char * src, char * p, char * varname)
 
     if( bracket && *p != '}')
     {
-        printf("error, unbalanced }\n");
+        fprintf(stderr, "error, unbalanced }\n");
         return NULL;
     }
 
     end = p;
     memcpy(varname, start, end-start);
     varname[end-start] = 0;
-    printf("found '%s'\n", varname);
 
     return p;
 }
@@ -166,10 +177,12 @@ void substitute(char * src, char * destination) // TODO : size of dest ?
             if(p == NULL) break;
             if(*p == '}') p++; // skip remaining bracket if ${..}
 
-            char * subst = NULL; // TODO getValue(varname);
+            char * subst = EVget(varname);
+
             if(subst == NULL)
             {
-                printf("undefined variable : %s\n", varname);
+                fprintf(stderr, "undefined variable : %s\n", varname);
+                *destination = 0;
                 break;
             }
 

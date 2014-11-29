@@ -13,11 +13,16 @@
 #include <stdio.h>
 #include <string.h>
 
+
+
 void print_history();
 void add_history( char * cmd );
 char * get_history_at();
 
 char get_char();
 void un_getc(char c);
+
+
+void substitute(char * src, char * destination);
 
 #endif /* HISTORY_H_ */
