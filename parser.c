@@ -10,7 +10,7 @@ TOKEN gettoken(char *word) {
    char *w;
 
    w = word;
-   while((c = getchar()) != EOF) {
+   while((c = get_char()) != EOF) {
       switch(state) {
       case NEUTRAL:
          switch(c) {
@@ -41,12 +41,12 @@ TOKEN gettoken(char *word) {
       case GTGT:
          if (c == '>')
             return(T_GTGT);
-         ungetc(c, stdin);
+         un_getc(c);
          return(T_GT);
       case INQUOTE:
          switch (c) {
          case '\\':
-            *w++ = getchar();
+            *w++ = get_char();
             continue;
          case '"':
             *w='\0';
@@ -65,7 +65,7 @@ TOKEN gettoken(char *word) {
          case '\n':
          case ' ':
          case '\t':
-            ungetc(c, stdin);
+            un_getc(c);
             *w = '\0';
             return(T_WORD);
          default:

@@ -3,7 +3,7 @@
 
    #include <stdio.h>
    #include <string.h>
-
+#include "preproc.h"
    #include "environ.h"
    #include "defs.h"
    #include "my_shell.h"
