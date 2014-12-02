@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS=-g -Wall #--std=c99 -D__GNU_SOURCE #-Iheaders
+CFLAGS=-g -Wall #--std=gnu99 -D__GNU_SOURCE #-Iheaders
 LDFLAGS=
 
 SRC=$(wildcard *.c)
