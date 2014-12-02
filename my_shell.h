@@ -6,7 +6,7 @@
    #include "defs.h"
    #include "environ.h"
 
-   void asg(int argc, char *argv[]);     /* assignment command */
+   void asg(int argc, char *argv[], BOOLEAN);     /* assignment command */
    void vexport(int argc, char *argv[]); /* export command */
    void set(int argc, char *argv[]);     /* set commnand */
 

@@ -39,7 +39,7 @@ void close_all_files( int sfd )
 }
 
 /* assignment command */
-void asg( int argc, char *argv[ ] )
+void asg( int argc, char *argv[ ], BOOLEAN export )
 {
     char *name, *val;
 
@@ -48,7 +48,14 @@ void asg( int argc, char *argv[ ] )
     {
         name = strtok( argv[ 0 ], "=" );
         val = strtok( NULL, "\1" ); /* get all that's left */
-        if( !EVset( name, val ) ) printf( "Can't assign\n" );
+        if( EVset( name, val ) )
+        {
+            if(export) EVexport(name);
+        }
+        else
+        {
+            printf( "Can't assign\n" );
+        }
     }
 }
 
@@ -57,17 +64,25 @@ void vexport( int argc, char *argv[ ] )
 {
     int i;
 
-    if( argc == 1 )
+    if( argc == 1 && !strchr( argv[ 0 ], '=' ) )
     {
         set( argc, argv );
         return;
     }
     for( i = 1; i < argc; i++ )
-        if( !EVexport( argv[ i ] ) )
+    {
+        if(strchr( argv[ i ], '=' ))
+        {
+            // assign and export
+            asg(1, &argv[i], TRUE);
+        }
+        else if( !EVexport( argv[ i ] ) )
         {
             printf( "Can't export %s\n", argv[ i ] );
             return;
         }
+    }
+
 }
 
 /* set command */
@@ -83,6 +98,8 @@ int invoke( int argc, char *argv[ ], int srcfd, char * srcfile, int dstfd, char 
 {
     if( argc == 0 || builtin( argc, argv, srcfd, dstfd ) ) return 0;
 
+    // export var
+    EVupdate();
 
     // TODO : redirections
     pid_t pid = fork();
@@ -176,13 +193,20 @@ void waitfor( int pid )
 /* do a built-in command */
 BOOLEAN builtin( int argc, char *argv[ ], int srcfd, int dstfd )
 {
-    if( strchr( argv[ 0 ], '=' ) != NULL ) asg( argc, argv );
+    if( strchr( argv[ 0 ], '=' ) != NULL ) asg( argc, argv, FALSE );
     else if( strcmp( argv[ 0 ], "export" ) == 0 ) vexport( argc, argv );
     else if( strcmp( argv[ 0 ], "set" ) == 0 ) set( argc, argv );
     else if( strcmp( argv[ 0 ], "exit" ) == 0 ) exit( 0 );
     else if( strcmp( argv[ 0 ], "history" ) == 0 ) print_history();
+//    else if( strcmp( argv[ 0 ], "cd" ) == 0 ) cd(argc, argv);
     else return ( FALSE );
     if( srcfd != 0 || dstfd != 1 ) fprintf( stderr, "illegal redirection or pipeline\n" );
     return ( TRUE );
 }
+
+
+//void cd(int argc, char * argv[])
+//{
+//    ;
+//}
 
