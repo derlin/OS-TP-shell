@@ -85,7 +85,7 @@ int invoke( int argc, char *argv[ ], int srcfd, char * srcfile, int dstfd, char 
 
 
     // TODO : redirections
-    int pid = fork();
+    pid_t pid = fork();
 
     if( pid < 0 )
     {
@@ -106,9 +106,11 @@ int invoke( int argc, char *argv[ ], int srcfd, char * srcfile, int dstfd, char 
     {
         // TODO
         /* parent */
-        // wait for the child to exit
-        int status;
-        waitpid(pid, &status, WUNTRACED | WCONTINUED);
+        int status = 0;
+        if(!bckgrnd){
+            // wait for the child to exit
+            waitpid(pid, &status, 0);
+        }
         return status;
     }
 
