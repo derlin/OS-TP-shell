@@ -4,7 +4,7 @@
 
 extern char **environ;
 
-/* static const int MAXVAR = 100;         /* max symbol table entries for env vars */
+/* static const int MAXVAR = 100;      /* max symbol table entries for env vars */
 static const int MAXVARNAMELEN = 40;   /* max symbol name length */
 #define MAXVAR 100
 

@@ -19,6 +19,10 @@ static char * history[ HSIZE ] =
 { 0 };
 static int top = 0;
 
+
+void subst_history( char * src, char * dest );
+
+
 //--------------------------------------------------------
 #define MAX_CMD 400
 static char cur_cmd[ MAX_CMD ] =
@@ -27,12 +31,12 @@ static int cur_index = 0;
 
 char get_char()
 {
-    char ret = cur_cmd[cur_index++];
+    char ret = cur_cmd[ cur_index++ ];
 
     if( ret == 0 )
     {
         int i = 0;
-        char temp[MAX_CMD];
+        char temp[ MAX_CMD ];
 
         while( 1 )
         {
@@ -41,7 +45,7 @@ char get_char()
 
             if( c == '\n' )
             {
-                temp[i] = 0;
+                temp[ i ] = 0;
                 break;
             }
 
@@ -54,25 +58,28 @@ char get_char()
 
         // reset
         cur_index = 0;
-        substitute(temp, cur_cmd);
-        if(*cur_cmd == 0) // error, undefined variable found
+        // substitute variables
+        substitute( temp, cur_cmd );
+        if( *cur_cmd == 0 )   // error, undefined variable found
         {
-            ret = '\n'; // return empty line
-            //*(cur_cmd+1) = 0; // next iter => start over
+            ret = '\n';   // return empty line
         }
-        else
+        else   // substitution ok
         {
-            ret = cur_cmd[cur_index++];
-            add_history(cur_cmd);
+            // first, make the substitution (h1 => cmd)
+            strcpy( temp, cur_cmd );
+            subst_history( temp, cur_cmd );
+            // then, add to history
+            add_history( cur_cmd );
+            // TODO printf("NEW CMD: %s", cur_cmd);
+            ret = cur_cmd[ cur_index++ ];
         }
     }
-
-
 
     return ret;
 }
 
-void un_getc(char c)
+void un_getc( char c )
 {
     cur_index--;
 }
@@ -95,21 +102,21 @@ void add_history( char * cmd )
 
 void print_history()
 {
-    if( history[ top ] == NULL )
+    int index = DecModulo(top);
+    if( history[ index ] == NULL )
     {
         printf( "History empty...\n" );
 
     }
     else
     {
-        int i = top, cnt = 1;
-
-        do
+        int cnt;
+        for(cnt = 1; cnt <= 10; cnt++)
         {
-            printf( " %2d: %s\n", cnt++, history[ i ] );
-            i = DecModulo(i);
-
-        }while( history[ i ] != 0 && i != top );
+            if(history[ index ] == 0) break; // security
+            printf( " %2d: %s", cnt, history[ index ] );
+            index = DecModulo(index);
+        }
     }
 }
 
@@ -121,74 +128,158 @@ char * get_history_at( int i )
 
 }
 
+
+// ------------------------------------------
+
+#define Is_delim(c) ((c) == '&' || (c) == '|' || (c) == ';')
+
+int is_hcmd( char * data, char ** start, int * hist_num )
+{
+    char * ph;
+    ph = data;
+
+    while( isspace(*ph) )
+        ph++;
+    if( *ph == 0 || *ph != 'h' ) return 0;
+
+    char * pn = ph + 1;
+
+    if( *pn && isdigit(*pn) )
+    {
+        char * pnn = pn + 1;
+        if( *pnn == 0 || ( *pnn && isspace(*pnn) ) || ( *pn == '1' && *pnn == '0' ) )
+        {
+            int hist = *pn - '0';
+            if( *pnn == '0' ) hist = 10;
+//            printf( "Found h%d at %d\n", hist, ph - data );
+
+            *hist_num = hist;
+            *start = ph;
+
+            return 1;
+        }
+    }
+    return 0;
+}
+
+void subst_history( char * src, char * dest )
+{
+    int first = 1;
+    char * start;
+    int hist_num;
+
+    while( *src )
+    {
+        if( first || Is_delim( *src ) )
+        {
+            if( !first ) *( dest++ ) = *( src++ );
+
+            if( is_hcmd( src, &start, &hist_num ) )
+            {
+                // copy spaces
+                while( src != start )
+                {
+                    *( dest++ ) = *( src++ );
+                }
+
+                char * subst = get_history_at( hist_num );
+                if( subst == 0 )
+                {
+                    fprintf( stderr, "no hist at %d\n", hist_num );
+
+                }
+                else
+                {
+//                    printf("subst %s\n", subst);
+                    strcpy( dest, subst );
+                    dest += strlen( subst ) - 1; // remove \n
+                    src += 2;
+                    if( hist_num == 10 ) src++;
+                }
+
+                if( *src == 0 ) break;
+            }
+        }
+
+        *( dest++ ) = *( src++ );
+        first = 0;
+    }
+
+    dest = 0;
+}
+
 // -------------------------------------
+// =====================================
 
 #define isValidStart(c) (isalpha(c))
 #define isValid(c)      (isalpha(c) || isdigit(c))
 
-char * extractVar(char * src, char * p, char * varname)
+char * extractVar( char * src, char * p, char * varname )
 {
-    char * start = p, * end;
+    char * start = p, *end;
     BOOLEAN bracket = *p == '{';
-    if(bracket){ start++; p++; } // skip {
-
-    if(!isValidStart(*p))
+    if( bracket )
     {
-        fprintf(stderr, "error: invalid character %c\n", *p);
+        start++;
+        p++;
+    }   // skip {
+
+    if( !isValidStart(*p) )
+    {
+        fprintf( stderr, "error: invalid character %c\n", *p );
         return NULL;
     }
 
-    while(*p && isValid(*p) ) p++;
+    while( *p && isValid(*p) )
+        p++;
 
-    if( bracket && *p != '}')
+    if( bracket && *p != '}' )
     {
-        fprintf(stderr, "error, unbalanced }\n");
+        fprintf( stderr, "error, unbalanced }\n" );
         return NULL;
     }
 
     end = p;
-    memcpy(varname, start, end-start);
-    varname[end-start] = 0;
+    memcpy( varname, start, end - start );
+    varname[ end - start ] = 0;
 
     return p;
 }
 
-
-void substitute(char * src, char * destination) // TODO : size of dest ?
+void substitute( char * src, char * destination )   // TODO : size of dest ?
 {
 
     char * dest = destination;
     char * p = src;
-    char varname[40];
+    char varname[ 40 ];
 
     int quote = 0;
 
-    while(*p)
+    while( *p )
     {
-        *(dest++) = *p;
-        if( *p == '\\' && *(p+1)) p++; // skip next
-        else if( *p == '"') quote = !quote;
-        else if(!quote && *p == '$')
+        *( dest++ ) = *p;
+        if( *p == '\\' && *( p + 1 ) ) p++;   // skip next
+        else if( *p == '"' ) quote = !quote;
+        else if( !quote && *p == '$' )
         {
             dest--;
 
+            p = extractVar( src, ++p, varname );
+            if( p == NULL ) break;
+            if( *p == '}' ) p++;   // skip remaining bracket if ${..}
 
-            p = extractVar(src, ++p, varname);
-            if(p == NULL) break;
-            if(*p == '}') p++; // skip remaining bracket if ${..}
+            char * subst = EVget( varname );
 
-            char * subst = EVget(varname);
-
-            if(subst == NULL)
+            if( subst == NULL )
             {
-                fprintf(stderr, "undefined variable : %s\n", varname);
+                fprintf( stderr, "undefined variable : %s\n", varname );
                 *destination = 0;
                 break;
             }
 
-            int len = strlen(subst);
-            memcpy(dest, subst, len);
-            dest+=len;
+            int len = strlen( subst );
+            memcpy( dest, subst, len );
+            dest += len;
             continue;
         }
         p++;
@@ -196,5 +287,4 @@ void substitute(char * src, char * destination) // TODO : size of dest ?
 
     *dest = 0;
 }
-
 
