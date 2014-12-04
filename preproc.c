@@ -6,10 +6,14 @@
  *
  */
 
+
+// TODO   how to manager the escaped char ? either skip it => echo "\"hello\"" not working
+//        or keep it: echo \$$$ => \$<pid>...
 #include "preproc.h"
 #include "defs.h"
 #include "environ.h"
 #include <ctype.h>
+#include <unistd.h>
 
 #define IncModulo(x)    ((x+1)%HSIZE)
 #define DecModulo(x)    ((x+HSIZE-1)%HSIZE)
@@ -257,18 +261,38 @@ void substitute( char * src, char * destination )   // TODO : size of dest ?
 
     while( *p )
     {
+
         *( dest++ ) = *p;
-        if( *p == '\\' && *( p + 1 ) ) p++;   // skip next
+        if( *p == '\\' && *( p + 1 ) ) *( dest++ ) = *(++p); // copy escaped char
         else if( *p == '"' ) quote = !quote;
         else if( !quote && *p == '$' )
         {
-            dest--;
+            dest--; p++;
+            char * subst;
+            char pid[5]; // for the pid in case of $$
 
-            p = extractVar( src, ++p, varname );
-            if( p == NULL ) break;
-            if( *p == '}' ) p++;   // skip remaining bracket if ${..}
+            if(*p && *p == '$' && (*(p+1) == 0 || isspace(*(p+1))))
+            {
+                // special case: $$ => pid
+                sprintf(varname, "$$");
+                sprintf(pid, "%d", getpid());
+                subst = pid;
+                p++; // skip second $
+            }
+            else
+            {
+                // normal case: check if really a variable
+                // if not, error
+                p = extractVar( src, p, varname );
+                if( p == NULL )
+                {
+                    *destination = 0;
+                    break;
+                }
+                if( *p == '}' ) p++;   // skip remaining bracket if ${..}
 
-            char * subst = EVget( varname );
+                subst = EVget( varname );
+            }
 
             if( subst == NULL )
             {
