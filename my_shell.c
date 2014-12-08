@@ -198,7 +198,7 @@ BOOLEAN builtin( int argc, char *argv[ ], int srcfd, int dstfd )
     else if( strcmp( argv[ 0 ], "set" ) == 0 ) set( argc, argv );
     else if( strcmp( argv[ 0 ], "exit" ) == 0 ) exit( 0 );
     else if( strcmp( argv[ 0 ], "history" ) == 0 ) print_history();
-//    else if( strcmp( argv[ 0 ], "cd" ) == 0 ) cd(argc, argv);
+    else if( strcmp( argv[ 0 ], "cd" ) == 0 ) cd(argc, argv);
     else return ( FALSE );
     if( srcfd != 0 || dstfd != 1 ) fprintf( stderr, "illegal redirection or pipeline\n" );
     return ( TRUE );
