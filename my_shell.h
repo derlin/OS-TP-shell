@@ -12,9 +12,10 @@
 
    void close_all_files(int start);      /* close all fds, ignore errors */
    int invoke(int argc, char *argv[], int srcfd, char * srcfile, 
-              int dstfd, char *dstfile, BOOLEAN append, BOOLEAN bckgrnd);  /* invoke a simple command */
+              int dstfd, char *dstfile, BOOLEAN append,
+              BOOLEAN bckgrnd);  /* invoke a simple command */
    void redirect(int srcfd, char *srcfile, int dstfd, char * dstfile,      /* I/O redirection */
-                 BOOLEAN append, BOOLEAN bckgrnd); 
+                 BOOLEAN append, BOOLEAN bckgrnd);
    void waitfor(int pid);                                      /* wait for child process */
 
    BOOLEAN builtin(int argc, char *argv[], int srcfd, int dstfd);  /* do a built-in command */

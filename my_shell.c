@@ -7,6 +7,7 @@
 #include "preproc.h"
 #include "my_shell.h"
 #include "syserr.h"
+#include "cd.h"
 
 /* a real shell */
 int main( int argc, char *argv[ ] )
@@ -121,14 +122,11 @@ int invoke( int argc, char *argv[ ], int srcfd, char * srcfile, int dstfd, char 
     }
     else
     {
-        // TODO
         /* parent */
-        int status = 0;
-        if(!bckgrnd){
-            // wait for the child to exit
-            waitpid(pid, &status, 0);
-        }
-        return status;
+        if(srcfd > 2) close(srcfd);
+        if(dstfd > 2) close(dstfd);
+
+        return pid;
     }
 
 }
@@ -187,6 +185,7 @@ void waitfor( int pid )
 
     while( ( wpid = wait( &status ) ) != pid && wpid != -1 )
         statusprt( wpid, status );
+
     if( wpid == pid ) statusprt( 0, status );
 }
 
@@ -203,10 +202,3 @@ BOOLEAN builtin( int argc, char *argv[ ], int srcfd, int dstfd )
     if( srcfd != 0 || dstfd != 1 ) fprintf( stderr, "illegal redirection or pipeline\n" );
     return ( TRUE );
 }
-
-
-//void cd(int argc, char * argv[])
-//{
-//    ;
-//}
-
