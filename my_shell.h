@@ -18,6 +18,7 @@
                  BOOLEAN append, BOOLEAN bckgrnd);
    void waitfor(int pid);                                      /* wait for child process */
 
-   BOOLEAN builtin(int argc, char *argv[], int srcfd, int dstfd);  /* do a built-in command */
+   BOOLEAN builtin(int argc, char *argv[], int srcfd, char *srcfile, int dstfd, char * dstfile, BOOLEAN append,
+           BOOLEAN bckgrnd);  /* do a built-in command */
 
 #endif

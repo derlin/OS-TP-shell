@@ -51,7 +51,7 @@ void asg( int argc, char *argv[ ], BOOLEAN export )
         val = strtok( NULL, "\1" ); /* get all that's left */
         if( EVset( name, val ) )
         {
-            if(export) EVexport(name);
+            if( export ) EVexport( name );
         }
         else
         {
@@ -72,10 +72,10 @@ void vexport( int argc, char *argv[ ] )
     }
     for( i = 1; i < argc; i++ )
     {
-        if(strchr( argv[ i ], '=' ))
+        if( strchr( argv[ i ], '=' ) )
         {
             // assign and export
-            asg(1, &argv[i], TRUE);
+            asg( 1, &argv[ i ], TRUE );
         }
         else if( !EVexport( argv[ i ] ) )
         {
@@ -97,7 +97,8 @@ void set( int argc, char *argv[ ] )
 int invoke( int argc, char *argv[ ], int srcfd, char * srcfile, int dstfd, char * dstfile,
         BOOLEAN append, BOOLEAN bckgrnd )
 {
-    if( argc == 0 || builtin( argc, argv, srcfd, dstfd ) ) return 0;
+    if( argc == 0 || builtin( argc, argv, srcfd, srcfile, dstfd, dstfile, append, bckgrnd ) )
+        return 0;
 
     // export var
     EVupdate();
@@ -114,7 +115,7 @@ int invoke( int argc, char *argv[ ], int srcfd, char * srcfile, int dstfd, char 
     else if( pid == 0 )
     {
         /* child */
-        redirect( srcfd, srcfile, dstfd, dstfile, append, bckgrnd);
+        redirect( srcfd, srcfile, dstfd, dstfile, append, bckgrnd );
         execvp( argv[ 0 ], argv );
 
         fprintf( stderr, "exec failed\n" );
@@ -123,8 +124,8 @@ int invoke( int argc, char *argv[ ], int srcfd, char * srcfile, int dstfd, char 
     else
     {
         /* parent */
-        if(srcfd > 2) close(srcfd);
-        if(dstfd > 2) close(dstfd);
+        if( srcfd > 2 ) close( srcfd );
+        if( dstfd > 2 ) close( dstfd );
 
         return pid;
     }
@@ -190,15 +191,69 @@ void waitfor( int pid )
 }
 
 /* do a built-in command */
-BOOLEAN builtin( int argc, char *argv[ ], int srcfd, int dstfd )
+BOOLEAN builtin( int argc, char *argv[ ], int srcfd, char *srcfile, int dstfd, char * dstfile,
+        BOOLEAN append, BOOLEAN bckgrnd )
 {
+
     if( strchr( argv[ 0 ], '=' ) != NULL ) asg( argc, argv, FALSE );
     else if( strcmp( argv[ 0 ], "export" ) == 0 ) vexport( argc, argv );
-    else if( strcmp( argv[ 0 ], "set" ) == 0 ) set( argc, argv );
+    else if( strcmp( argv[ 0 ], "set" ) == 0 )
+    {
+        int stdin_bk = -1, stdout_bk = -1;
+        int fopened = 0;
+
+        if( dstfd != 1 )
+        {
+            int stdout_bk = dup( STDOUT_FILENO );
+            if( close( 1 ) == -1 ) syserr( "closing dstfd in redirect(), " __FILE__ );
+            if( dstfd > 1 )
+            {
+                if( dup( dstfd ) != 1 ) fatal( "can't dup dstfd in redirect(), " __FILE__ );
+                close(dstfd);
+            }
+            else
+            {
+                fopened = 1;
+                int flags = O_WRONLY | O_CREAT;
+                if( !append ) flags |= O_TRUNC;
+                if( open( dstfile, flags, 0666 ) == -1 )
+                {
+                    fprintf( stderr, "can't create %s\n", dstfile );
+                    exit( 0 );
+                }
+                if( append )
+                    if( lseek( 1, 0L, 2 ) == -1 ) syserr( "can't seek in redirect(), " __FILE__ );
+            }
+
+            set( argc, argv );
+            fflush( stdout );
+            int res = dup2( stdout_bk, STDOUT_FILENO );
+            res = close( stdout_bk );
+            if(fopened) close(dstfd);
+
+        }
+/*
+        if( dstfd != STDOUT_FILENO )
+        {
+//            int stdin_bk = dup( STDIN_FILENO );
+            int stdout_bk = dup( STDOUT_FILENO );
+            if( close( 1 ) == -1 ) syserr( "closing dstfd in redirect(), " __FILE__ );
+            int res = dup2( dstfd, STDOUT_FILENO );
+            res = close( dstfd );
+            set( argc, argv );
+//            dup2( stdin_bk, STDIN_FILENO );
+            fflush( stdout );
+            res = dup2( stdout_bk, STDOUT_FILENO );
+            res = close( stdout_bk );
+//            if(srcfd != 0) close(srcfd);
+//            if(dstfd != 1) close(dstfd);
+//            close_all_files(3);
+        }*/
+    }
     else if( strcmp( argv[ 0 ], "exit" ) == 0 ) exit( 0 );
     else if( strcmp( argv[ 0 ], "history" ) == 0 ) print_history();
-    else if( strcmp( argv[ 0 ], "cd" ) == 0 ) cd(argc, argv);
+    else if( strcmp( argv[ 0 ], "cd" ) == 0 ) cd( argc, argv );
     else return ( FALSE );
-    if( srcfd != 0 || dstfd != 1 ) fprintf( stderr, "illegal redirection or pipeline\n" );
+    //if( srcfd != 0 || dstfd != 1 ) fprintf( stderr, "illegal redirection or pipeline\n" );
     return ( TRUE );
 }
