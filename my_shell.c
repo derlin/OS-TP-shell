@@ -116,6 +116,7 @@ int invoke( int argc, char *argv[ ], int srcfd, char * srcfile, int dstfd, char 
     {
         /* child */
         redirect( srcfd, srcfile, dstfd, dstfile, append, bckgrnd );
+        close_all_files( 3 );
         execvp( argv[ 0 ], argv );
 
         fprintf( stderr, "exec failed\n" );
@@ -145,6 +146,7 @@ void redirect( int srcfd, char *srcfile, int dstfd, char * dstfile, BOOLEAN appe
     }
     if( srcfd != 0 )
     {
+        // since we close stdin, the next fd will necessary be placed at index 0 !
         if( close( 0 ) == -1 ) syserr( "closing srcfd in redirect()" __FILE__ );
         if( srcfd > 0 )
         {
@@ -158,6 +160,7 @@ void redirect( int srcfd, char *srcfile, int dstfd, char * dstfile, BOOLEAN appe
     }
     if( dstfd != 1 )
     {
+        // since we close stdout, the next fd will necessary be placed at index 1 !
         if( close( 1 ) == -1 ) syserr( "closing dstfd in redirect(), " __FILE__ );
         if( dstfd > 1 )
         {
@@ -176,7 +179,6 @@ void redirect( int srcfd, char *srcfile, int dstfd, char * dstfile, BOOLEAN appe
                 if( lseek( 1, 0L, 2 ) == -1 ) syserr( "can't seek in redirect(), " __FILE__ );
         }
     }
-    close_all_files( 3 );
 }
 
 /* wait for child process */
@@ -200,55 +202,39 @@ BOOLEAN builtin( int argc, char *argv[ ], int srcfd, char *srcfile, int dstfd, c
     else if( strcmp( argv[ 0 ], "set" ) == 0 )
     {
         int stdin_bk = -1, stdout_bk = -1;
-        int fopened = 0;
 
-        if( dstfd != 1 )
+        if( dstfd != 1 || srcfd != 0 )
         {
-            int stdout_bk = dup( STDOUT_FILENO );
-            if( close( 1 ) == -1 ) syserr( "closing dstfd in redirect(), " __FILE__ );
-            if( dstfd > 1 )
-            {
-                if( dup( dstfd ) != 1 ) fatal( "can't dup dstfd in redirect(), " __FILE__ );
-                close(dstfd);
-            }
-            else
-            {
-                fopened = 1;
-                int flags = O_WRONLY | O_CREAT;
-                if( !append ) flags |= O_TRUNC;
-                if( open( dstfile, flags, 0666 ) == -1 )
-                {
-                    fprintf( stderr, "can't create %s\n", dstfile );
-                    exit( 0 );
-                }
-                if( append )
-                    if( lseek( 1, 0L, 2 ) == -1 ) syserr( "can't seek in redirect(), " __FILE__ );
-            }
+            if(srcfd != 0) stdin_bk = dup( STDIN_FILENO );
+            if(dstfd != 0) stdout_bk = dup( STDOUT_FILENO );
+
+            redirect( srcfd, srcfile, dstfd, dstfile, append, bckgrnd );
 
             set( argc, argv );
+
             fflush( stdout );
-            int res = dup2( stdout_bk, STDOUT_FILENO );
-            res = close( stdout_bk );
-            if(fopened) close(dstfd);
+
+            if(stdin_bk > 0)
+            {
+                dup2( stdin_bk, STDIN_FILENO );
+                close(stdin_bk);
+            }
+
+            if(stdout_bk > 0)
+            {
+                dup2( stdout_bk, STDOUT_FILENO );
+                close(stdout_bk);
+            }
+
+            if(srcfd > 0) close(srcfd);
+            if(dstfd > 0) close(dstfd);
 
         }
-/*
-        if( dstfd != STDOUT_FILENO )
+        else
         {
-//            int stdin_bk = dup( STDIN_FILENO );
-            int stdout_bk = dup( STDOUT_FILENO );
-            if( close( 1 ) == -1 ) syserr( "closing dstfd in redirect(), " __FILE__ );
-            int res = dup2( dstfd, STDOUT_FILENO );
-            res = close( dstfd );
-            set( argc, argv );
-//            dup2( stdin_bk, STDIN_FILENO );
-            fflush( stdout );
-            res = dup2( stdout_bk, STDOUT_FILENO );
-            res = close( stdout_bk );
-//            if(srcfd != 0) close(srcfd);
-//            if(dstfd != 1) close(dstfd);
-//            close_all_files(3);
-        }*/
+            set(argc, argv);
+        }
+
     }
     else if( strcmp( argv[ 0 ], "exit" ) == 0 ) exit( 0 );
     else if( strcmp( argv[ 0 ], "history" ) == 0 ) print_history();
