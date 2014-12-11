@@ -192,54 +192,88 @@ void waitfor( int pid )
     if( wpid == pid ) statusprt( 0, status );
 }
 
+// -------
+
+static int stdin_bk = -1, stdout_bk = -1;
+
+void builtin_redirect_begin( int srcfd, char *srcfile, int dstfd, char * dstfile, BOOLEAN append,
+        BOOLEAN bckgrnd )
+{
+    stdin_bk = -1;
+    stdout_bk = -1;
+
+    if( srcfd != STDIN_FILENO || dstfd != STDOUT_FILENO )
+    {
+        if( srcfd != STDIN_FILENO ) stdin_bk = dup( STDIN_FILENO );
+        if( dstfd != STDOUT_FILENO ) stdout_bk = dup( STDOUT_FILENO );
+
+        redirect( srcfd, srcfile, dstfd, dstfile, append, bckgrnd );
+    }
+}
+
+void builtin_redirect_end( int srcfd, char *srcfile, int dstfd, char * dstfile, BOOLEAN append,
+        BOOLEAN bckgrnd )
+{
+    if( srcfd != STDIN_FILENO || dstfd != STDOUT_FILENO )
+    {
+        fflush( stdout );
+
+        if( stdin_bk > 0 )
+        {
+            dup2( stdin_bk, STDIN_FILENO );
+            close( stdin_bk );
+        }
+
+        if( stdout_bk > 0 )
+        {
+            dup2( stdout_bk, STDOUT_FILENO );
+            close( stdout_bk );
+        }
+
+        if( srcfd > STDIN_FILENO ) close( srcfd );
+        if( dstfd > STDOUT_FILENO ) close( dstfd );
+    }
+}
+
+// -------
+
 /* do a built-in command */
 BOOLEAN builtin( int argc, char *argv[ ], int srcfd, char *srcfile, int dstfd, char * dstfile,
         BOOLEAN append, BOOLEAN bckgrnd )
 {
 
-    if( strchr( argv[ 0 ], '=' ) != NULL ) asg( argc, argv, FALSE );
-    else if( strcmp( argv[ 0 ], "export" ) == 0 ) vexport( argc, argv );
+    if( strchr( argv[ 0 ], '=' ) != NULL )
+    {
+        builtin_redirect_begin( srcfd, srcfile, dstfd, dstfile, append, bckgrnd );
+        asg( argc, argv, FALSE );
+        builtin_redirect_end( srcfd, srcfile, dstfd, dstfile, append, bckgrnd );
+    }
+    else if( strcmp( argv[ 0 ], "export" ) == 0 )
+    {
+        builtin_redirect_begin( srcfd, srcfile, dstfd, dstfile, append, bckgrnd );
+        vexport( argc, argv );
+        builtin_redirect_end( srcfd, srcfile, dstfd, dstfile, append, bckgrnd );
+    }
     else if( strcmp( argv[ 0 ], "set" ) == 0 )
     {
-        int stdin_bk = -1, stdout_bk = -1;
-
-        if( dstfd != 1 || srcfd != 0 )
-        {
-            if(srcfd != 0) stdin_bk = dup( STDIN_FILENO );
-            if(dstfd != 0) stdout_bk = dup( STDOUT_FILENO );
-
-            redirect( srcfd, srcfile, dstfd, dstfile, append, bckgrnd );
-
-            set( argc, argv );
-
-            fflush( stdout );
-
-            if(stdin_bk > 0)
-            {
-                dup2( stdin_bk, STDIN_FILENO );
-                close(stdin_bk);
-            }
-
-            if(stdout_bk > 0)
-            {
-                dup2( stdout_bk, STDOUT_FILENO );
-                close(stdout_bk);
-            }
-
-            if(srcfd > 0) close(srcfd);
-            if(dstfd > 0) close(dstfd);
-
-        }
-        else
-        {
-            set(argc, argv);
-        }
-
+        builtin_redirect_begin( srcfd, srcfile, dstfd, dstfile, append, bckgrnd );
+        set( argc, argv );
+        builtin_redirect_end( srcfd, srcfile, dstfd, dstfile, append, bckgrnd );
+    }
+    else if( strcmp( argv[ 0 ], "history" ) == 0 )
+    {
+        builtin_redirect_begin( srcfd, srcfile, dstfd, dstfile, append, bckgrnd );
+        print_history();
+        builtin_redirect_end( srcfd, srcfile, dstfd, dstfile, append, bckgrnd );
+    }
+    else if( strcmp( argv[ 0 ], "cd" ) == 0 )
+    {
+        builtin_redirect_begin( srcfd, srcfile, dstfd, dstfile, append, bckgrnd );
+        cd( argc, argv );
+        builtin_redirect_end( srcfd, srcfile, dstfd, dstfile, append, bckgrnd );
     }
     else if( strcmp( argv[ 0 ], "exit" ) == 0 ) exit( 0 );
-    else if( strcmp( argv[ 0 ], "history" ) == 0 ) print_history();
-    else if( strcmp( argv[ 0 ], "cd" ) == 0 ) cd( argc, argv );
     else return ( FALSE );
-    //if( srcfd != 0 || dstfd != 1 ) fprintf( stderr, "illegal redirection or pipeline\n" );
     return ( TRUE );
 }
+
