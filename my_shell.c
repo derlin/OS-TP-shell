@@ -9,6 +9,34 @@
 #include "syserr.h"
 #include "cd.h"
 
+/**
+ * MODIFICATIONS:
+ *
+ *  - add builtin commands cd and exit
+ *
+ *  - implement the invoke method
+ *
+ *  - add support for redirections with built-in commands
+ *      Notes:
+ *      I could not find a way to follow the DRY principle...
+ *      So I used pre-run and post-run routines, which could also have
+ *      been implemented in a macro.
+ *      Only the changes to the destfd are supported, since modifying the
+ *      stdin for a builtin command does not make sense (echo ".." > cd ??
+ *      does not work, at least in zsh !)
+ *      I decided to reuse the redirect method. The only thing to do was cuting
+ *      the last line (close_all_files) from redirect and pasting it in the invoke
+ *      methodd.
+ *
+ *  - fix bug when assigning variables:
+ *      before, only "export a" was allowed. Defining + exporting at once
+ *      (export a=toto) resulted in a variable named a=toto with an empty
+ *      value...
+ *      Now, assign + export supported !
+ *
+ */
+
+
 /* a real shell */
 int main( int argc, char *argv[ ] )
 {
@@ -194,43 +222,34 @@ void waitfor( int pid )
 
 // -------
 
-static int stdin_bk = -1, stdout_bk = -1;
+static int stdout_bk = -1; // backup of the previous stdout fileno (builtin redirect)
 
+/* backup the current STDOUT_FILENO fd and do the redirect */
 void builtin_redirect_begin( int srcfd, char *srcfile, int dstfd, char * dstfile, BOOLEAN append,
         BOOLEAN bckgrnd )
 {
-    stdin_bk = -1;
     stdout_bk = -1;
 
-    if( srcfd != STDIN_FILENO || dstfd != STDOUT_FILENO )
+    if( dstfd != STDOUT_FILENO )
     {
-        if( srcfd != STDIN_FILENO ) stdin_bk = dup( STDIN_FILENO );
-        if( dstfd != STDOUT_FILENO ) stdout_bk = dup( STDOUT_FILENO );
-
+        stdout_bk = dup( STDOUT_FILENO );
         redirect( srcfd, srcfile, dstfd, dstfile, append, bckgrnd );
     }
 }
 
+/* set the STDOUT_FILENO fd to its old state and close all files */
 void builtin_redirect_end( int srcfd, char *srcfile, int dstfd, char * dstfile, BOOLEAN append,
         BOOLEAN bckgrnd )
 {
-    if( srcfd != STDIN_FILENO || dstfd != STDOUT_FILENO )
+    if( dstfd != STDOUT_FILENO )
     {
         fflush( stdout );
-
-        if( stdin_bk > 0 )
-        {
-            dup2( stdin_bk, STDIN_FILENO );
-            close( stdin_bk );
-        }
 
         if( stdout_bk > 0 )
         {
             dup2( stdout_bk, STDOUT_FILENO );
             close( stdout_bk );
         }
-
-        if( srcfd > STDIN_FILENO ) close( srcfd );
         if( dstfd > STDOUT_FILENO ) close( dstfd );
     }
 }
@@ -242,37 +261,37 @@ BOOLEAN builtin( int argc, char *argv[ ], int srcfd, char *srcfile, int dstfd, c
         BOOLEAN append, BOOLEAN bckgrnd )
 {
 
-    if( strchr( argv[ 0 ], '=' ) != NULL )
+    if( strchr( argv[ 0 ], '=' ) != NULL ) // assignment
     {
         builtin_redirect_begin( srcfd, srcfile, dstfd, dstfile, append, bckgrnd );
         asg( argc, argv, FALSE );
         builtin_redirect_end( srcfd, srcfile, dstfd, dstfile, append, bckgrnd );
     }
-    else if( strcmp( argv[ 0 ], "export" ) == 0 )
+    else if( strcmp( argv[ 0 ], "export" ) == 0 ) // export name [,names] | export name=value
     {
         builtin_redirect_begin( srcfd, srcfile, dstfd, dstfile, append, bckgrnd );
         vexport( argc, argv );
         builtin_redirect_end( srcfd, srcfile, dstfd, dstfile, append, bckgrnd );
     }
-    else if( strcmp( argv[ 0 ], "set" ) == 0 )
+    else if( strcmp( argv[ 0 ], "set" ) == 0 ) // print the environment variables
     {
         builtin_redirect_begin( srcfd, srcfile, dstfd, dstfile, append, bckgrnd );
         set( argc, argv );
         builtin_redirect_end( srcfd, srcfile, dstfd, dstfile, append, bckgrnd );
     }
-    else if( strcmp( argv[ 0 ], "history" ) == 0 )
+    else if( strcmp( argv[ 0 ], "history" ) == 0 ) // display the last 10 commands
     {
         builtin_redirect_begin( srcfd, srcfile, dstfd, dstfile, append, bckgrnd );
         print_history();
         builtin_redirect_end( srcfd, srcfile, dstfd, dstfile, append, bckgrnd );
     }
-    else if( strcmp( argv[ 0 ], "cd" ) == 0 )
+    else if( strcmp( argv[ 0 ], "cd" ) == 0 ) // change directory
     {
         builtin_redirect_begin( srcfd, srcfile, dstfd, dstfile, append, bckgrnd );
         cd( argc, argv );
         builtin_redirect_end( srcfd, srcfile, dstfd, dstfile, append, bckgrnd );
     }
-    else if( strcmp( argv[ 0 ], "exit" ) == 0 ) exit( 0 );
+    else if( strcmp( argv[ 0 ], "exit" ) == 0 ) exit( 0 ); // exit
     else return ( FALSE );
     return ( TRUE );
 }
