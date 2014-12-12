@@ -3,6 +3,13 @@
 #include <unistd.h>
 #include <stdlib.h>
 
+/**
+ * MODIFICATIONS:
+ *  - replace calls to getchar and ungetc by our custom get_char
+ *    and unget_char. The parser now gets its input from the
+ *    preproc, not stdin !
+ */
+
 /* collect and classify token */
 TOKEN gettoken(char *word) {
    enum {NEUTRAL, GTGT, INQUOTE, INWORD} state = NEUTRAL;

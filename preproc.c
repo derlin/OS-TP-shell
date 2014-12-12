@@ -1,9 +1,54 @@
 /**
- * @file history.c
+ * @file preproc.c
  * 
  * @date 27 Nov 2014
  * @author Lucy Linder <lucy.derlin@gmail.com>
  *
+ * PURPOSE:
+ * - keep the history up to date
+ * - variable substitution
+ *
+ * HISTORY
+ * =======
+ *
+ * The history is made up of the last ten valid lines entered, i.e.
+ * passed to the parser. By invalid, we mean a line for which
+ * the substitution process failed.
+ *
+ *
+ * VARIABLE SUBSTITUTION
+ * =====================
+ *
+ * The shell supports the following:
+ *   $varname
+ *   ${varname}
+ *
+ * example:
+ *  a=toto
+ *  b=titi
+ *
+ *  echo $a ${a}X$b "${b}" \$\$  => toto totoXtiti ${b} $$
+ *
+ * The special variable $$ is replaced by the current process's PID.
+ * Note that a variable inside double quotes is not replaced.
+ *
+ * BUGS/SPECIAL CASES
+ * ==================
+ * - the treatment of the "\" escape character is tricky. Should we
+ *   remove it during substitution or not ?
+ * - the command on multiple lines are properly treated by the history:
+ *
+ *   fmk-> echo "lala
+ *   lulu"
+ *   fmk-> history
+ *      1: history
+ *      2: lulu"
+ *      3: echo "lala
+ *
+ *
+ * - the history command is added to the history before the command's
+ *   execution. So the h1 will always be history... It could be possible to
+ *   change it, but other special cases would appear (no "right" solution)
  */
 
 

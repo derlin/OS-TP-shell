@@ -2,11 +2,18 @@
 #include <string.h>
 #include <stdlib.h>
 
+/**
+ * MODIFICATIONS:
+ *  - increase MAXVAR, since in a real unix system we can easily have more than 100
+ *    env variables (in my computer: 108...)
+ */
+
+
 extern char **environ;
 
 /* static const int MAXVAR = 100;      /* max symbol table entries for env vars */
 static const int MAXVARNAMELEN = 40;   /* max symbol name length */
-#define MAXVAR 100
+#define MAXVAR 200
 
 static struct varslot {          /* symbol table */
    char *name;       /* variable name */
