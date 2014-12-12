@@ -32,10 +32,42 @@
  * The special variable $$ is replaced by the current process's PID.
  * Note that a variable inside double quotes is not replaced.
  *
+ *
+ * CHOICES
+ * =======
+ * We decided to do the substitution first and to ignore the input if
+ * the substitution fails:
+ *
+ *      fmk-> echo $a
+ *      undefined variable : a
+ *
+ * Then, the input is tested against the hX patterns, which will  be replaced by the
+ * corresponding history entry. Finally, the line is added to the history.
+ *
+ * This means that echo $$ will be stored into history as echo <pid> and that
+ * hX will never show up in history.
+ *
+ * Those are choices that are highly debatable (and I guess I would do
+ * it differently now that I think of it...). But keep in mind that if
+ * we'd want another behaviour, it would not be such a hassle: just move some lines
+ * around in the get_char method !
+ *
+ *
  * BUGS/SPECIAL CASES
  * ==================
  * - the treatment of the "\" escape character is tricky. Should we
  *   remove it during substitution or not ?
+ *   Right now, the "\" is removed and the escaped char is left untouched:
+ *      fmk-> echo \\n
+ *      \n
+ *      fmk-> echo \$\$ \$a
+ *      $$ \$a
+ *  This behaviour seams correct, but the bug happens when we try to
+ *  escape the double quote:
+ *      fmk-> echo "\"hello\""
+ *      hello""
+ *   TODO !
+ *
  * - the command on multiple lines are properly treated by the history:
  *
  *   fmk-> echo "lala
@@ -49,6 +81,9 @@
  * - the history command is added to the history before the command's
  *   execution. So the h1 will always be history... It could be possible to
  *   change it, but other special cases would appear (no "right" solution)
+ *
+ * - as previously mentioned, the variables are substituted BEFORE the
+ *   command is added to history.
  */
 
 
@@ -308,7 +343,7 @@ void substitute( char * src, char * destination )   // TODO : size of dest ?
     {
 
         *( dest++ ) = *p;
-        if( *p == '\\' && *( p + 1 ) ) *( dest++ ) = *(++p); // copy escaped char
+        if( *p == '\\' && *( p + 1 ) ) *( dest-1 ) = *(++p); // skip escaped char and ignore the next one
         else if( *p == '"' ) quote = !quote;
         else if( !quote && *p == '$' )
         {
