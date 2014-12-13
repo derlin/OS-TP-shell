@@ -147,21 +147,21 @@ char get_char()
         // reset
         cur_index = 0;
         // substitute variables
-        substitute( temp, cur_cmd );
-        if( *cur_cmd == 0 )   // error, undefined variable found
-        {
-            ret = '\n';   // return empty line
-        }
-        else   // substitution ok
-        {
+//        substitute( temp, cur_cmd );
+//        if( *cur_cmd == 0 )   // error, undefined variable found
+//        {
+//            ret = '\n';   // return empty line
+//        }
+//        else   // substitution ok
+//        {
             // first, make the substitution (h1 => cmd)
-            strcpy( temp, cur_cmd );
+//            strcpy( temp, cur_cmd );
             subst_history( temp, cur_cmd );
             // then, add to history
             add_history( cur_cmd );
             // TODO printf("NEW CMD: %s", cur_cmd);
             ret = cur_cmd[ cur_index++ ];
-        }
+//        }
     }
 
     return ret;
@@ -353,8 +353,6 @@ void substitute( char * src, char * destination )   // TODO : size of dest ?
     char * dest = destination;
     char * p = src;
     char varname[ 40 ];
-
-    int quote = 0;
 
     while( *p )
     {
