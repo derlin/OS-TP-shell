@@ -15,6 +15,9 @@
  * passed to the parser. By invalid, we mean a line for which
  * the substitution process failed.
  *
+ * If we use h4 and there is no such history, the string ("h4") is
+ * left untouched and a warning message is printed to stderr.
+ *
  *
  * VARIABLE SUBSTITUTION
  * =====================
@@ -66,7 +69,8 @@
  *  escape the double quote:
  *      fmk-> echo "\"hello\""
  *      hello""
- *   TODO !
+ *   V2: get rid of the "escaping quote", which is not really useful.
+ *       To escape a variable, simply write \$a !
  *
  * - the command on multiple lines are properly treated by the history:
  *
@@ -215,7 +219,7 @@ char * get_history_at( int i )
 
 // ------------------------------------------
 
-#define Is_delim(c) ((c) == '&' || (c) == '|' || (c) == ';')
+#define Is_delim(c) ((c) == '&' || (c) == '|' || (c) == ';' || (c) == '\n')
 
 int is_hcmd( char * data, char ** start, int * hist_num )
 {
@@ -231,7 +235,7 @@ int is_hcmd( char * data, char ** start, int * hist_num )
     if( *pn && isdigit(*pn) )
     {
         char * pnn = pn + 1;
-        if( *pnn == 0 || ( *pnn && isspace(*pnn) ) || ( *pn == '1' && *pnn == '0' ) )
+        if( *pnn == 0 || ( *pnn && (isspace(*pnn) || Is_delim(*pnn)) ) || ( *pn == '1' && *pnn == '0' ) )
         {
             int hist = *pn - '0';
             if( *pnn == '0' ) hist = 10;
@@ -246,6 +250,20 @@ int is_hcmd( char * data, char ** start, int * hist_num )
     return 0;
 }
 
+
+/*
+ * substitute hX be the corresponding command.
+ * should support cases like:
+ *    > h1
+ *    > echo lala; h2;h4
+ *    > h3 | grep B
+ *
+ * so the rules are:
+ * - hX is either the first chars, or is preceded by a delim + any number of spaces.
+ * - every space, other char, etc. must be preserved.
+ * @param src the original line
+ * @param dest the line after substitution of all hX
+ */
 void subst_history( char * src, char * dest )
 {
     int first = 1;
@@ -256,6 +274,7 @@ void subst_history( char * src, char * dest )
     {
         if( first || Is_delim( *src ) )
         {
+            // copy delimiters
             if( !first ) *( dest++ ) = *( src++ );
 
             if( is_hcmd( src, &start, &hist_num ) )
@@ -274,7 +293,6 @@ void subst_history( char * src, char * dest )
                 }
                 else
                 {
-//                    printf("subst %s\n", subst);
                     strcpy( dest, subst );
                     dest += strlen( subst ) - 1; // remove \n
                     src += 2;
@@ -284,9 +302,8 @@ void subst_history( char * src, char * dest )
                 if( *src == 0 ) break;
             }
         }
-
+        first = Is_delim(*src);
         *( dest++ ) = *( src++ );
-        first = 0;
     }
 
     dest = 0;
@@ -344,8 +361,9 @@ void substitute( char * src, char * destination )   // TODO : size of dest ?
 
         *( dest++ ) = *p;
         if( *p == '\\' && *( p + 1 ) ) *( dest-1 ) = *(++p); // skip escaped char and ignore the next one
-        else if( *p == '"' ) quote = !quote;
-        else if( !quote && *p == '$' )
+//        else if( *p == '"' ) quote = !quote;
+//        else if( !quote && *p == '$' )
+        else if( *p == '$' )
         {
             dest--; p++;
             char * subst;

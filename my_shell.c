@@ -34,6 +34,16 @@
  *      value...
  *      Now, assign + export supported !
  *
+ *
+ *
+ * TODO
+ * ====
+ *
+ *  - currently, typing
+ *      > grep B
+ *    would block the shell. I would be nice to catch the ctrl+c sognal and not exiting the shell,
+ *    but the current subprocess instead.
+ *
  */
 
 
@@ -147,7 +157,7 @@ int invoke( int argc, char *argv[ ], int srcfd, char * srcfile, int dstfd, char 
         close_all_files( 3 );
         execvp( argv[ 0 ], argv );
 
-        fprintf( stderr, "exec failed\n" );
+        fprintf( stderr, "exec failed: %s\n", argv[0] );
         exit( EXIT_FAILURE );
     }
     else
