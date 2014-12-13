@@ -4,7 +4,7 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include "parser.h"
-#include "preproc.h"
+#include "substitute.h"
 #include "my_shell.h"
 #include "syserr.h"
 #include "cd.h"

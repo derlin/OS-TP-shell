@@ -9,20 +9,13 @@
 #ifndef HISTORY_H_
 #define HISTORY_H_
 
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
-
-
-
+/* history management */
 void print_history();
 void add_history( char * cmd );
 char * get_history_at();
 
+/* preprocessing */
 char get_char();
 void un_getc(char c);
-
-
-void substitute(char * src, char * destination);
 
 #endif /* HISTORY_H_ */

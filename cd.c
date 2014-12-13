@@ -4,7 +4,7 @@
  * @date 2 Dec 2014
  * @author Lucy Linder <lucy.derlin@gmail.com>
  *
-  * PURPOSE:
+ * PURPOSE:
  * this file implements the cd function. It supports absolute and relative
  * paths, as well as cd - (back to previous directory) and the ~ (shortcut for
  * user home directory).
@@ -24,53 +24,56 @@
 #define PWD         "PWD"
 #define HOME_DIR    "HOME"
 
+void update_cwd( char * npwd )
+{
+    if( chdir( npwd ) == 0 )   // change dir ok
+    {
+        // update environment variables
+        char * pwd;
+        pwd = EVget( PWD );
+        int ok = EVset( OLDPWD, pwd );
+
+        npwd = get_current_dir_name();   // get absolute path
+        ok &= EVset( PWD, npwd );
+        free( npwd );
+
+        if( ok ) printf( "CWD: %s\n", EVget( PWD ) );   // feedback
+    }
+    else   // change dir failed
+    {
+        fprintf( stderr, "Could not cwd, %s does not exist.\n", npwd );
+    }
+}
+
+// --------------------------------------------------
+
 void cd( int argc, char * argv[ ] )
 {
-    if( argc != 2 ) // not exactly one argument, print usage
+    if( argc != 2 )   // not exactly one argument, print usage
     {
         fprintf( stderr, "usage: cd [dir]\n" );
         return;
     }
 
-    char * arg = argv[1];
-    char * pwd, * npwd; // current and new cwd
+    char * arg = argv[ 1 ];
 
-    char buff[1024]; // to append paths in case of "~"
-
-    pwd = EVget(PWD); // get current cwd
-
-    if(strcmp(arg, "-") == 0) // back to OLDPWD
+    if( strcmp( arg, "-" ) == 0 )   // back to OLDPWD
     {
-        npwd = EVget(OLDPWD);
+        update_cwd( EVget( OLDPWD ) );
     }
-    else if(arg[0] == '~') // replace ~ with user_home
+    else if( arg[ 0 ] == '~' )   // replace ~ with user_home
     {
-        char * home = EVget(HOME_DIR);
-        strncpy(buff, home, 1024);
-        strncpy(buff + strlen(home), arg+1, 1024);
-        npwd = buff;
+        char * home = EVget( HOME_DIR );
+        char buff[ 1024 ];
+
+        strncpy( buff, home, 1024 );
+        strncpy( buff + strlen( home ), arg + 1, 1024 );
+
+        update_cwd( buff );
     }
-    else // relative or absolute path, do nothing
+    else   // relative or absolute path, no special treatment
     {
-        npwd = arg;
+        update_cwd( arg );
     }
-
-
-    if(chdir(npwd) == 0) // change dir ok
-    {
-        // update environment variables
-        int ok = EVset(OLDPWD, pwd);
-        npwd = get_current_dir_name(); // get absolute path
-        ok &= EVset(PWD, npwd);
-        free(npwd);
-
-        if(ok) printf("CWD: %s\n", EVget(PWD)); // feedback
-    }
-    else // change dir failed
-    {
-        fprintf(stderr, "Could not cwd, %s does not exist.\n", npwd);
-    }
-
-    return;
 }
 
