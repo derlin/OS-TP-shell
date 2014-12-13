@@ -393,8 +393,9 @@ void substitute( char * src, char * destination )   // TODO : size of dest ?
             if( subst == NULL )
             {
                 fprintf( stderr, "undefined variable : %s\n", varname );
-                *destination = 0;
-                break;
+                //*destination = 0;
+                //break;
+                continue;
             }
 
             int len = strlen( subst );
