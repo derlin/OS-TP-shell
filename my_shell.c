@@ -135,7 +135,16 @@ void set( int argc, char *argv[ ] )
 int invoke( int argc, char *argv[ ], int srcfd, char * srcfile, int dstfd, char * dstfile,
         BOOLEAN append, BOOLEAN bckgrnd )
 {
-    int i = 0; for(; i < argc; i++) substitute(argv[i], argv[i]);
+    int i = 0; for(; i < argc; i++){
+
+        char * subst = substitute(argv[i]);
+
+        if(subst != NULL){
+            // replace arg by the substituted string
+            free(argv[i]);
+            argv[i] = subst;
+        }
+    }
     if( argc == 0 || builtin( argc, argv, srcfd, srcfile, dstfd, dstfile, append, bckgrnd ) )
         return 0;
 

@@ -10,7 +10,7 @@
 #define SUBSTITUTE_H_
 
 
-void substitute(char * src, char * destination);
+char * substitute(char * src);
 
 
 #endif /* SUBSTITUTE_H_ */

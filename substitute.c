@@ -25,7 +25,7 @@ char * extractVar( char * src, char * p, char * varname )
     {
         start++;
         p++;
-    }   // skip {
+    }   // skip "{"
 
     if( !isValidStart(*p) )
     {
@@ -52,64 +52,76 @@ char * extractVar( char * src, char * p, char * varname )
 // -------------------------------------
 
 
-void substitute( char * src, char * destination )   // TODO : size of dest ?
+char * substitute( char * src )   // TODO : size of dest ?
 {
+    char temp[2048]; // buffer for the substituted string
+    char * sp = src, * dp = temp;
 
-    char * dest = destination;
-    char * p = src;
-    char varname[ 40 ];
+    int substOccurred = 0;
 
-    while( *p )
+    while( *sp )
     {
 
-        *( dest++ ) = *p;
-        if( *p == '\\' && *( p + 1 ) ) *( dest-1 ) = *(++p); // skip escaped char and ignore the next one
-//        else if( *p == '"' ) quote = !quote;
-//        else if( !quote && *p == '$' )
-        else if( *p == '$' )
+        *( dp++ ) = *sp; // copy current
+
+        if( *sp == '\\' && *( sp + 1 ) ) // escape character
         {
-            dest--; p++;
+            *( dp-1 ) = *(++sp); // skip escaped char and ignore the next one
+        }
+        else if( *sp == '$' ) // candidate to a var
+        {
             char * subst;
+            char varname[ 40 ];
             char pid[5]; // for the pid in case of $$
 
-            if(*p && *p == '$' && (*(p+1) == 0 || isspace(*(p+1))))
+            dp--; sp++; // remove $ from dest
+
+            if(*sp && *sp == '$' && (*(sp+1) == 0 || isspace(*(sp+1))))
             {
                 // special case: $$ => pid
                 sprintf(varname, "$$");
                 sprintf(pid, "%d", getpid());
                 subst = pid;
-                p++; // skip second $
+                sp++; // skip second $
             }
             else
             {
-                // normal case: check if really a variable
-                // if not, error
-                p = extractVar( src, p, varname );
-                if( p == NULL )
+                // normal case: parse variable name
+                sp = extractVar( src, sp, varname );
+                if( sp == NULL )
                 {
-                    *destination = 0;
-                    break;
+                    // parse error: don't process further
+                    return NULL;
                 }
-                if( *p == '}' ) p++;   // skip remaining bracket if ${..}
 
+                if( *sp == '}' ) sp++; // skip remaining bracket if ${..}
                 subst = EVget( varname );
             }
 
             if( subst == NULL )
             {
-                fprintf( stderr, "undefined variable : %s\n", varname );
+                fprintf( stderr, "warning: undefined variable : %s\n", varname );
                 //*destination = 0;
                 //break;
                 continue;
             }
 
             int len = strlen( subst );
-            memcpy( dest, subst, len );
-            dest += len;
+            memcpy( dp, subst, len );
+            dp += len;
+            substOccurred = 1;
             continue;
         }
-        p++;
+        sp++;
     }
 
-    *dest = 0;
+    *dp = 0;
+
+    char * ret = NULL;
+    if(substOccurred){
+        ret = (char *) malloc(strlen(dp) +1);
+        strcpy(ret, temp);
+    }
+
+    return ret;
 }
