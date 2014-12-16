@@ -1,5 +1,6 @@
 #include "parser.h"
 #include "syserr.h"
+#include "substitute.h"
 #include <unistd.h>
 #include <stdlib.h>
 
@@ -94,7 +95,7 @@ TOKEN command(int *waitpid, BOOLEAN makepipe, int *pipefd) {
 
    argc = srcfd = 0; dstfd = 1;
    while(1) {
-      switch(token = gettoken(word)) {
+      switch(token = gettoken(word)) {m
       case T_WORD:
          if (argc == MAX_ARG) {
             fprintf(stderr, "Too many args\n");

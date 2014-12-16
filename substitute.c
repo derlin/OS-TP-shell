@@ -20,33 +20,33 @@
 
 #define MAX_ARG_SIZE    1024
 
-char * extractVar( char * src, char * p, char * varname )
+char * extractVar(char * src, char * p, char * varname)
 {
     char * start = p, *end;
     BOOLEAN bracket = *p == '{';
-    if( bracket )
+    if(bracket)
     {
         start++;
         p++;
     }   // skip "{"
 
-    if( !isValidStart(*p) )
+    if(!isValidStart(*p))
     {
-        fprintf( stderr, "error: invalid character %c\n", *p );
+        fprintf( stderr, "error: invalid character %c\n", *p);
         return NULL;
     }
 
-    while( *p && isValid(*p) )
+    while(*p && isValid(*p))
         p++;
 
-    if( bracket && *p != '}' )
+    if(bracket && *p != '}')
     {
-        fprintf( stderr, "error, unbalanced }\n" );
+        fprintf( stderr, "error, unbalanced }\n");
         return NULL;
     }
 
     end = p;
-    memcpy( varname, start, end - start );
+    memcpy(varname, start, end - start);
     varname[ end - start ] = 0;
 
     return p;
@@ -54,30 +54,31 @@ char * extractVar( char * src, char * p, char * varname )
 
 // -------------------------------------
 
-char * substitute( char * src )   // TODO : size of dest ?
+char * substitute(char * src)   // TODO : size of dest ?
 {
     char * ret = NULL;   // return value
     char buffer[ MAX_ARG_SIZE ];   // buffer for the substituted string
 
-    char * sp = src, *dp = buffer; // pointers
+    char * sp = src, *dp = buffer;   // pointers
 
     int substOccurred = 0;
 
-    while( *sp )
+    while(*sp)
     {
-        if(dp - buffer >= MAX_WORD){ // avoid segfaults
+        if(dp - buffer >= MAX_WORD)
+        {   // avoid segfaults
             fprintf(stderr, "Ran out of memory during substitution!");
             return NULL;
         }
 
         /* escape char */
-        if( *sp == '\\' && *( sp + 1 ) )
+        if(*sp == '\\' && *(sp + 1))
         {
             sp++;   // skip '\'
-            *( dp ) = *( sp++ );   // copy and skip the next one
+            *(dp) = *(sp++);   // copy and skip the next one
         }
         /* potential variable */
-        else if( *sp == '$' )
+        else if(*sp == '$')
         {
             char * subst;
             char varname[ 40 ];
@@ -85,56 +86,74 @@ char * substitute( char * src )   // TODO : size of dest ?
 
             sp++;   // ignore '$'
 
-            if( *sp && *sp == '$' && ( *( sp + 1 ) == 0 || isspace(*(sp+1)) ) )
+            if(*sp && *sp == '$' && (*(sp + 1) == 0 || isspace(*(sp+1))))
             {
                 // we have a $$, replace $$ by pid
-                sprintf( varname, "$$" );
-                sprintf( pid, "%d", getpid() );
+                sprintf(varname, "$$");
+                sprintf(pid, "%d", getpid());
                 subst = pid;
                 sp++;   // skip second $
             }
             else
             {
                 // normal case: parse variable name
-                sp = extractVar( src, sp, varname );
-                if( sp == NULL )
+                sp = extractVar(src, sp, varname);
+                if(sp == NULL)
                 {
                     // parse error: don't process further
                     return NULL;
                 }
 
-                if( *sp == '}' ) sp++;   // skip remaining bracket if ${..}
-                subst = EVget( varname );
+                substOccurred = 1;
+
+                if(*sp == '}') sp++;   // skip remaining bracket if ${..}
+                subst = EVget(varname);
             }
 
-            if( subst == NULL )
+            if(subst == NULL)
             {
                 // variable with no value
-                fprintf( stderr, "warning: undefined variable : %s\n", varname );
+                fprintf( stderr, "warning: undefined variable : %s\n", varname);
             }
             else
             {
                 // copy value in dest
-                int len = strlen( subst );
-                memcpy( dp, subst, len );
+                int len = strlen(subst);
+                memcpy(dp, subst, len);
                 dp += len;
-                substOccurred = 1;
             }
         }
         else
         {
             // normal case: copy char
-            *( dp++ ) = *( sp++ );
+            *(dp++) = *(sp++);
         }
     }
 
     *dp = 0;
 
-    if( substOccurred )
+    if(substOccurred)
     {
-        ret = (char *) malloc( strlen( dp ) + 1 );
-        strcpy( ret, buffer );
+        ret = (char *) malloc(strlen(dp) + 1);
+        strcpy(ret, buffer);
     }
 
     return ret;
+}
+
+// -------------------------------------
+
+void substitute_args(int argc, char * argv[ ])
+{
+    int i = 0;
+    for(; i < argc; i++)
+    {
+        char * subst = substitute(argv[ i ]);
+        if(subst != NULL)
+        {
+            // replace arg by the substituted string
+            free(argv[ i ]);
+            argv[ i ] = subst;
+        }
+    }
 }
