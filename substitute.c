@@ -8,6 +8,7 @@
 
 #include "substitute.h"
 #include "environ.h"
+#include "parser.h"
 #include <ctype.h>
 #include <unistd.h>
 #include <stdlib.h>
@@ -16,6 +17,8 @@
 
 #define isValidStart(c) (isalpha(c))
 #define isValid(c)      (isalpha(c) || isdigit(c))
+
+#define MAX_ARG_SIZE    1024
 
 char * extractVar( char * src, char * p, char * varname )
 {
@@ -51,38 +54,44 @@ char * extractVar( char * src, char * p, char * varname )
 
 // -------------------------------------
 
-
 char * substitute( char * src )   // TODO : size of dest ?
 {
-    char temp[2048]; // buffer for the substituted string
-    char * sp = src, * dp = temp;
+    char * ret = NULL;   // return value
+    char buffer[ MAX_ARG_SIZE ];   // buffer for the substituted string
+
+    char * sp = src, *dp = buffer; // pointers
 
     int substOccurred = 0;
 
     while( *sp )
     {
-
-        *( dp++ ) = *sp; // copy current
-
-        if( *sp == '\\' && *( sp + 1 ) ) // escape character
-        {
-            *( dp-1 ) = *(++sp); // skip escaped char and ignore the next one
+        if(dp - buffer >= MAX_WORD){ // avoid segfaults
+            fprintf(stderr, "Ran out of memory during substitution!");
+            return NULL;
         }
-        else if( *sp == '$' ) // candidate to a var
+
+        /* escape char */
+        if( *sp == '\\' && *( sp + 1 ) )
+        {
+            sp++;   // skip '\'
+            *( dp ) = *( sp++ );   // copy and skip the next one
+        }
+        /* potential variable */
+        else if( *sp == '$' )
         {
             char * subst;
             char varname[ 40 ];
-            char pid[5]; // for the pid in case of $$
+            char pid[ 5 ];   // for the pid in case of $$
 
-            dp--; sp++; // remove $ from dest
+            sp++;   // ignore '$'
 
-            if(*sp && *sp == '$' && (*(sp+1) == 0 || isspace(*(sp+1))))
+            if( *sp && *sp == '$' && ( *( sp + 1 ) == 0 || isspace(*(sp+1)) ) )
             {
-                // special case: $$ => pid
-                sprintf(varname, "$$");
-                sprintf(pid, "%d", getpid());
+                // we have a $$, replace $$ by pid
+                sprintf( varname, "$$" );
+                sprintf( pid, "%d", getpid() );
                 subst = pid;
-                sp++; // skip second $
+                sp++;   // skip second $
             }
             else
             {
@@ -94,33 +103,37 @@ char * substitute( char * src )   // TODO : size of dest ?
                     return NULL;
                 }
 
-                if( *sp == '}' ) sp++; // skip remaining bracket if ${..}
+                if( *sp == '}' ) sp++;   // skip remaining bracket if ${..}
                 subst = EVget( varname );
             }
 
             if( subst == NULL )
             {
+                // variable with no value
                 fprintf( stderr, "warning: undefined variable : %s\n", varname );
-                //*destination = 0;
-                //break;
-                continue;
             }
-
-            int len = strlen( subst );
-            memcpy( dp, subst, len );
-            dp += len;
-            substOccurred = 1;
-            continue;
+            else
+            {
+                // copy value in dest
+                int len = strlen( subst );
+                memcpy( dp, subst, len );
+                dp += len;
+                substOccurred = 1;
+            }
         }
-        sp++;
+        else
+        {
+            // normal case: copy char
+            *( dp++ ) = *( sp++ );
+        }
     }
 
     *dp = 0;
 
-    char * ret = NULL;
-    if(substOccurred){
-        ret = (char *) malloc(strlen(dp) +1);
-        strcpy(ret, temp);
+    if( substOccurred )
+    {
+        ret = (char *) malloc( strlen( dp ) + 1 );
+        strcpy( ret, buffer );
     }
 
     return ret;
