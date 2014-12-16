@@ -15,8 +15,8 @@
 #include <stdio.h>
 #include <string.h>
 
-#define isValidStart(c) (isalpha(c))
-#define isValid(c)      (isalpha(c) || isdigit(c))
+#define isValidStart(c) (isalpha(c) || (c) == '_')
+#define isValid(c)      (isalpha(c) || isdigit(c) || (c) == '_')
 
 #define MAX_ARG_SIZE    1024
 
@@ -32,7 +32,7 @@ char * extractVar(char * src, char * p, char * varname)
 
     if(!isValidStart(*p))
     {
-        fprintf( stderr, "error: invalid character %c\n", *p);
+        fprintf( stderr, "parse error: invalid character '%c'\n", *p);
         return NULL;
     }
 
@@ -41,7 +41,7 @@ char * extractVar(char * src, char * p, char * varname)
 
     if(bracket && *p != '}')
     {
-        fprintf( stderr, "error, unbalanced }\n");
+        fprintf( stderr, "parse error, unbalanced '}'\n");
         return NULL;
     }
 
@@ -54,21 +54,16 @@ char * extractVar(char * src, char * p, char * varname)
 
 // -------------------------------------
 
-char * substitute(char * src)   // TODO : size of dest ?
+int substitute(char * src, char * dest, int len)   // TODO : size of dest ?
 {
-    char * ret = NULL;   // return value
-    char buffer[ MAX_ARG_SIZE ];   // buffer for the substituted string
-
-    char * sp = src, *dp = buffer;   // pointers
-
-    int substOccurred = 0;
+    char * sp = src, *dp = dest;   // pointers
 
     while(*sp)
     {
-        if(dp - buffer >= MAX_WORD)
+        if(dp - dest >= len)
         {   // avoid segfaults
-            fprintf(stderr, "Ran out of memory during substitution!");
-            return NULL;
+            fprintf(stderr, "out of memory error: expansion too long.\n");
+            return SUBST_OUT_OF_MEM;
         }
 
         /* escape char */
@@ -101,10 +96,9 @@ char * substitute(char * src)   // TODO : size of dest ?
                 if(sp == NULL)
                 {
                     // parse error: don't process further
-                    return NULL;
+                    *dp = 0; // properly terminate the string
+                    return SUBST_PARSE_ERROR;
                 }
-
-                substOccurred = 1;
 
                 if(*sp == '}') sp++;   // skip remaining bracket if ${..}
                 subst = EVget(varname);
@@ -132,28 +126,7 @@ char * substitute(char * src)   // TODO : size of dest ?
 
     *dp = 0;
 
-    if(substOccurred)
-    {
-        ret = (char *) malloc(strlen(dp) + 1);
-        strcpy(ret, buffer);
-    }
-
-    return ret;
+    return SUBST_OK;
 }
-
 // -------------------------------------
 
-void substitute_args(int argc, char * argv[ ])
-{
-    int i = 0;
-    for(; i < argc; i++)
-    {
-        char * subst = substitute(argv[ i ]);
-        if(subst != NULL)
-        {
-            // replace arg by the substituted string
-            free(argv[ i ]);
-            argv[ i ] = subst;
-        }
-    }
-}

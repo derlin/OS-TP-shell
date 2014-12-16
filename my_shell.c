@@ -137,7 +137,7 @@ int invoke(int argc, char *argv[ ], int srcfd, char * srcfile, int dstfd, char *
         BOOLEAN append, BOOLEAN bckgrnd)
 {
     // variable substitution
-    substitute_args(argc, argv);
+//    substitute_args(argc, argv);
 
     if(argc == 0 || builtin(argc, argv, srcfd, srcfile, dstfd, dstfile, append, bckgrnd)) return 0;
 

@@ -9,20 +9,19 @@
 #ifndef SUBSTITUTE_H_
 #define SUBSTITUTE_H_
 
+#define SUBST_OK 0
+#define SUBST_OUT_OF_MEM  1
+#define SUBST_PARSE_ERROR 2
 
 /**
  * Substitute variables in the given string.
  * @param src the string to parse for variables
- * @return a pointer to a string after variable expansion,
- * or null if no variable was present in src.
+ * @param dest where the result will be stored
+ * @param len length of dest
+ * @return 0 = 0k, 1 = buffer too short, 2 = parse error
+ * Note: error messages are printed to stderr
  */
-char * substitute(char * src);
 
-/**
- * Utility function: expand all the arguments.
- * @param argc the number of arguments
- * @param argv the arguments
- */
-void substitute_args(int argc, char * argv[]);
+int substitute(char * src, char * dest, int len);
 
 #endif /* SUBSTITUTE_H_ */
