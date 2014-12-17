@@ -4,95 +4,43 @@
  * @date 27 Nov 2014
  * @author Lucy Linder <lucy.derlin@gmail.com>
  *
- * PURPOSE:
- * - keep the history up to date
- * - variable substitution
+ * PURPOSE
+ * =======
+ *  - v1: manage the history + hX commands and do the variable expansion. Problem: by doing the expansion here,
+ *      something like: >a=A; echo $a would not work...
+ *  - v2: only keep the history up to date (+ hX commands). The expansion is made in the parser.
  *
  * HISTORY
  * =======
  *
  * The history is made up of the last ten valid lines entered, i.e.
- * passed to the parser. By invalid, we mean a line for which
- * the substitution process failed.
- *
- * If we use h4 and there is no such history, the string ("h4") is
- * left untouched and a warning message is printed to stderr.
+ * passed to the parser. A line is considered invalid if it contained a hX command where the X exceeds
+ * the number of history entries.
  *
  *
- * VARIABLE SUBSTITUTION
- * =====================
+ * CHOICES, BUGS AND SPECIAL CASES
+ * ===============================
  *
- * The shell supports the following:
- *   $varname
- *   ${varname}
+ * - If the input is a hX with X > 10, it is not considered as a hX command, so it will be left untouched.
+ * - If we use h4 and there is no such history, a warning message is printed to stderr and the whole
+ *   input is discarded.
+ * - the history command is also stored into history, as well as "repeated commands" and hX expansions.
+ * - the history always stores the whole input, unparsed. So the variables are not expanded.
+ * - special case/bug: this implementation does not cope with multiple lines input:
+ *      > echo "lala
+ *      lulu"
+ *      lala
+ *      lulu
  *
- * example:
- *  a=toto
- *  b=titi
+ *      > history
+ *        1: history
+ *        2: lulu"
+ *        3: echo "lala
  *
- *  echo $a ${a}X$b "${b}" \$\$  => toto totoXtiti ${b} $$
+ * - the command "history" is stored before its execution, so the first line will always be "1: history"...
  *
- * The special variable $$ is replaced by the current process's PID.
- * Note that a variable inside double quotes is not replaced.
- *
- *
- * CHOICES
- * =======
- * We decided to do the substitution first and to ignore the input if
- * the substitution fails:
- *
- *      fmk-> echo $a
- *      undefined variable : a
- *
- * Then, the input is tested against the hX patterns, which will  be replaced by the
- * corresponding history entry. Finally, the line is added to the history.
- *
- * This means that echo $$ will be stored into history as echo <pid> and that
- * hX will never show up in history.
- *
- * Those are choices that are highly debatable (and I guess I would do
- * it differently now that I think of it...). But keep in mind that if
- * we'd want another behaviour, it would not be such a hassle: just move some lines
- * around in the get_char method !
- *
- *
- * BUGS/SPECIAL CASES
- * ==================
- * - the treatment of the "\" escape character is tricky. Should we
- *   remove it during substitution or not ?
- *   Right now, the "\" is removed and the escaped char is left untouched:
- *      fmk-> echo \\n
- *      \n
- *      fmk-> echo \$\$ \$a
- *      $$ \$a
- *  This behaviour seams correct, but the bug happens when we try to
- *  escape the double quote:
- *      fmk-> echo "\"hello\""
- *      hello""
- *   V2: get rid of the "escaping quote", which is not really useful.
- *       To escape a variable, simply write \$a !
- *
- * - the command on multiple lines are properly treated by the history:
- *
- *   fmk-> echo "lala
- *   lulu"
- *   fmk-> history
- *      1: history
- *      2: lulu"
- *      3: echo "lala
- *
- *
- * - the history command is added to the history before the command's
- *   execution. So the h1 will always be history... It could be possible to
- *   change it, but other special cases would appear (no "right" solution)
- *
- * - as previously mentioned, the variables are substituted BEFORE the
- *   command is added to history.
  */
 
-
-// TODO   how to manager the escaped char ? either skip it => echo "\"hello\"" not working
-//        or keep it: echo \$$$ => \$<pid>...
 #include "preproc.h"
 #include "defs.h"
 #include "environ.h"
@@ -107,24 +55,25 @@
 #define HSIZE   10
 
 static char * history[ HSIZE ] =
-{ 0 };
+        { 0 };
 static int top = 0;
 
-
-void subst_history( char * src, char * dest );
-
+BOOLEAN subst_history( char * src, char * dest );
 
 //--------------------------------------------------------
-#define MAX_CMD 400
-static char cur_cmd[ MAX_CMD ] =
-{ 0 };
+#define MAX_CMD 1024
+
+static char cur_cmd[ MAX_CMD ] = { 0 };
 static int cur_index = 0;
 
+/**
+ * @return the next available char
+ */
 char get_char()
 {
     char ret = cur_cmd[ cur_index++ ];
 
-    if( ret == 0 )
+    if( ret == 0 ) // get new input
     {
         int i = 0;
         char temp[ MAX_CMD ];
@@ -140,105 +89,123 @@ char get_char()
                 break;
             }
 
-            if( i >= MAX_CMD )
+            if( i >= MAX_CMD ) // avoid buffer overflows
             {
-                fprintf( stderr, "Aie, buffer too short (pre-parser)\n" );
+                fprintf( stderr, "error: input too long.\n" );
                 exit( 1 );
             }
         }
 
         // reset
         cur_index = 0;
-        // substitute variables
-//        substitute( temp, cur_cmd );
-//        if( *cur_cmd == 0 )   // error, undefined variable found
-//        {
-//            ret = '\n';   // return empty line
-//        }
-//        else   // substitution ok
-//        {
-            // first, make the substitution (h1 => cmd)
-//            strcpy( temp, cur_cmd );
-            subst_history( temp, cur_cmd );
-            // then, add to history
+        // replace hX by the matching history item
+        if(subst_history( temp, cur_cmd ))
+        {
+            // add to history only if no errors
             add_history( cur_cmd );
-            // TODO printf("NEW CMD: %s", cur_cmd);
-            ret = cur_cmd[ cur_index++ ];
-//        }
+        }
+        else
+        {
+            // error => replace input by an empty cmd
+            // so that the shell will redisplay the prompt
+            strcpy( cur_cmd, "\n" );
+        }
+
+        ret = cur_cmd[ cur_index++ ];
     }
 
     return ret;
 }
 
+/**
+ * undo a get_char
+ * @param c the char to put back (unused).
+ */
 void un_getc( char c )
 {
     cur_index--;
 }
 //--------------------------------------------------------
 
+/**
+ * add a command to the history
+ * @param cmd the command to add
+ */
 void add_history( char * cmd )
 {
     if( history[ top ] != 0 ) free( history[ top ] );
-
     if( ( history[ top ] = (char *) malloc( strlen( cmd ) + 1 ) ) == NULL )
     {
-        fprintf( stderr, "Could not add cmd to history\n" );
+        fprintf( stderr, "Could not add %s to history (malloc error).\n", cmd );
     }
     else
     {
         strcpy( history[ top ], cmd );
-        top = IncModulo(top);
+        top = IncModulo( top );
     }
 }
 
+/**
+ * print the current history entries. The last cmd is at index 1.
+ */
 void print_history()
 {
-    int index = DecModulo(top);
+    int index = DecModulo( top );
     if( history[ index ] == NULL )
     {
+        // should never happen.
         printf( "History empty...\n" );
-
     }
     else
     {
         int cnt;
-        for(cnt = 1; cnt <= 10; cnt++)
+        for( cnt = 1; cnt <= 10; cnt++ )
         {
-            if(history[ index ] == 0) break; // security
+            if( history[ index ] == 0 ) break;   // security
             printf( " %2d: %s", cnt, history[ index ] );
-            index = DecModulo(index);
+            index = DecModulo( index );
         }
     }
 }
 
+/**
+ * get an history entry.
+ * @param i the entry index
+ * @return either the matching command, or NULL if it does not exist.
+ */
 char * get_history_at( int i )
 {
-
     i = ( top + HSIZE - i ) % HSIZE;
     return history[ i ];   // either NULL or cmd
-
 }
-
 
 // ------------------------------------------
 
 #define Is_delim(c) ((c) == '&' || (c) == '|' || (c) == ';' || (c) == '\n')
 
-int is_hcmd( char * data, char ** start, int * hist_num )
+/**
+ * check if the command is a valid hX
+ * @param data the whole input string
+ * @param start a pointer to the start of a command
+ * @param hist_num the parsed history entry number, if any
+ * @return 1 if a hX command was found, 0 otherwise
+ */
+BOOLEAN is_hcmd( char * data, char ** start, int * hist_num )
 {
     char * ph;
     ph = data;
 
-    while( isspace(*ph) )
+    while( isspace( *ph ) )
         ph++;
     if( *ph == 0 || *ph != 'h' ) return 0;
 
     char * pn = ph + 1;
 
-    if( *pn && isdigit(*pn) )
+    if( *pn && isdigit( *pn ) )
     {
         char * pnn = pn + 1;
-        if( *pnn == 0 || ( *pnn && (isspace(*pnn) || Is_delim(*pnn)) ) || ( *pn == '1' && *pnn == '0' ) )
+        if( *pnn == 0 || ( *pnn && ( isspace(*pnn) || Is_delim( *pnn ) ) )
+                || ( *pn == '1' && *pnn == '0' ) )
         {
             int hist = *pn - '0';
             if( *pnn == '0' ) hist = 10;
@@ -246,12 +213,11 @@ int is_hcmd( char * data, char ** start, int * hist_num )
             *hist_num = hist;
             *start = ph;
 
-            return 1;
+            return TRUE;
         }
     }
-    return 0;
+    return FALSE;
 }
-
 
 /*
  * substitute hX be the corresponding command.
@@ -266,7 +232,14 @@ int is_hcmd( char * data, char ** start, int * hist_num )
  * @param src the original line
  * @param dest the line after substitution of all hX
  */
-void subst_history( char * src, char * dest )
+
+/**
+ * substitute hX commands by the corresponding history entry.
+ * @param src the whole input to parse
+ * @param dest the expanded result
+ * @return false if an error occurred (hX with X > number of entries), true otherwise.
+ */
+BOOLEAN subst_history( char * src, char * dest )
 {
     int first = 1;
     char * start;
@@ -290,13 +263,13 @@ void subst_history( char * src, char * dest )
                 char * subst = get_history_at( hist_num );
                 if( subst == 0 )
                 {
-                    fprintf( stderr, "no hist at %d\n", hist_num );
-
+                    fprintf( stderr, "error, no history at %d\n", hist_num );
+                    return FALSE;
                 }
                 else
                 {
                     strcpy( dest, subst );
-                    dest += strlen( subst ) - 1; // remove \n
+                    dest += strlen( subst ) - 1;   // remove \n
                     src += 2;
                     if( hist_num == 10 ) src++;
                 }
@@ -304,10 +277,11 @@ void subst_history( char * src, char * dest )
                 if( *src == 0 ) break;
             }
         }
-        first = Is_delim(*src);
+        first = Is_delim( *src );
         *( dest++ ) = *( src++ );
     }
 
     dest = 0;
+    return TRUE;
 }
 

@@ -18,15 +18,12 @@
  *
  *  - add support for redirections with built-in commands
  *      Notes:
- *      I could not find a way to follow the DRY principle...
- *      So I used pre-run and post-run routines, which could also have
- *      been implemented in a macro.
  *      Only the changes to the destfd are supported, since modifying the
  *      stdin for a builtin command does not make sense (echo ".." > cd ??
  *      does not work, at least in zsh !)
- *      I decided to reuse the redirect method. The only thing to do was cuting
+ *      I decided to reuse the redirect method. The only thing to do was cutting
  *      the last line (close_all_files) from redirect and pasting it in the invoke
- *      methodd.
+ *      method.
  *
  *  - fix bug when assigning variables:
  *      before, only "export a" was allowed. Defining + exporting at once
@@ -38,11 +35,12 @@
  *
  * TODO
  * ====
- *
- *  - currently, typing
+ *  - currently, typing:
  *      > grep B
- *    would block the shell. I would be nice to catch the ctrl+c sognal and not exiting the shell,
- *    but the current subprocess instead.
+ *    would block the shell. I would be nice that the ctrl+c signal would not exit the shell,
+ *    but kill the current subprocess instead.
+ *
+ *  - add support for unset varname
  *
  */
 
@@ -136,15 +134,11 @@ void set(int argc, char *argv[ ])
 int invoke(int argc, char *argv[ ], int srcfd, char * srcfile, int dstfd, char * dstfile,
         BOOLEAN append, BOOLEAN bckgrnd)
 {
-    // variable substitution
-//    substitute_args(argc, argv);
-
     if(argc == 0 || builtin(argc, argv, srcfd, srcfile, dstfd, dstfile, append, bckgrnd)) return 0;
 
     // export var
     EVupdate();
 
-    // TODO : redirections
     pid_t pid = fork();
 
     if(pid < 0)

@@ -5,10 +5,13 @@
 #include <stdlib.h>
 
 /**
- * MODIFICATIONS:
+ * MODIFICATIONS
+ * =============
  *  - replace calls to getchar and ungetc by our custom get_char
  *    and unget_char. The parser now gets its input from the
  *    preproc, not stdin !
+ *  - do the variable substitution for arguments, commands and
+ *    src/dstfile
  */
 
 /* collect and classify token */
