@@ -24,56 +24,78 @@
 #define PWD         "PWD"
 #define HOME_DIR    "HOME"
 
-void update_cwd( char * npwd )
+/**
+ * recode the get_current_dir_name from unistd, since the latter
+ * gives compile errors (implicit declaration (??) )
+ * @return the current working directory, as a [mallocated] string
+ */
+char * current_dir_name()
 {
-    if( chdir( npwd ) == 0 )   // change dir ok
+    char buff[ 1024 ], *cwd = NULL;
+    if(getcwd(buff, sizeof(buff)) != NULL &&   //
+            (cwd = (char*) malloc(strlen(buff) + 1)) != NULL)
+    {
+        strcpy(cwd, buff);
+    }
+    else
+    {
+        fprintf(stderr, "cd: could not retrieve cwd.\n");
+        exit(1);
+    }
+
+    return cwd;
+}
+
+void update_cwd(char * npwd)
+{
+    if(chdir(npwd) == 0)   // change dir ok
     {
         // update environment variables
         char * pwd;
-        pwd = EVget( PWD );
-        int ok = EVset( OLDPWD, pwd );
+        pwd = EVget( PWD);
+        int ok = EVset( OLDPWD, pwd);
 
-        npwd = get_current_dir_name();   // get absolute path
-        ok &= EVset( PWD, npwd );
-        free( npwd );
+        npwd = current_dir_name();   // get absolute path
+        ok &= EVset( PWD, npwd);
+        free(npwd);
 
-        if( ok ) printf( "CWD: %s\n", EVget( PWD ) );   // feedback
+        if(ok) printf("  CWD: %s\n", EVget( PWD));   // feedback
     }
     else   // change dir failed
     {
-        fprintf( stderr, "Could not cwd, %s does not exist.\n", npwd );
+        fprintf( stderr, "cd: no such file or directory '%s'\n", npwd);
     }
 }
 
 // --------------------------------------------------
 
-void cd( int argc, char * argv[ ] )
+void cd(int argc, char * argv[ ])
 {
-    if( argc != 2 )   // not exactly one argument, print usage
+    if(argc != 2)   // not exactly one argument, print usage
     {
-        fprintf( stderr, "usage: cd [dir]\n" );
+        fprintf( stderr, "usage: cd [dir]\n");
         return;
     }
 
     char * arg = argv[ 1 ];
 
-    if( strcmp( arg, "-" ) == 0 )   // back to OLDPWD
+    if(strcmp(arg, "-") == 0)   // back to OLDPWD
     {
-        update_cwd( EVget( OLDPWD ) );
+        update_cwd(EVget(OLDPWD));
     }
-    else if( arg[ 0 ] == '~' )   // replace ~ with user_home
+    else if(arg[ 0 ] == '~')   // replace ~ with user_home
     {
-        char * home = EVget( HOME_DIR );
+        char * home = EVget( HOME_DIR);
         char buff[ 1024 ];
 
-        strncpy( buff, home, 1024 );
-        strncpy( buff + strlen( home ), arg + 1, 1024 );
+        strncpy(buff, home, 1024);
+        strncpy(buff + strlen(home), arg + 1, 1024);
 
-        update_cwd( buff );
+        update_cwd(buff);
     }
     else   // relative or absolute path, no special treatment
     {
-        update_cwd( arg );
+        update_cwd(arg);
     }
 }
 
