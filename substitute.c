@@ -73,7 +73,7 @@ char * extractVar(char * src, char * p, char * varname)
     char * start = p, *end;
     BOOLEAN bracket = *p == '{';
 
-    if(bracket)  // skip "{"
+    if(bracket)   // skip "{"
     {
         start++;
         p++;
@@ -96,14 +96,14 @@ char * extractVar(char * src, char * p, char * varname)
 
     end = p;
 
-    if(end-start >= MAX_VARNAME_LEN)
+    if(end - start >= MAX_VARNAME_LEN)
     {
         fprintf(stderr, "error: variable name too long.\n");
         return NULL;
     }
 
     memcpy(varname, start, end - start);
-    varname[ end - start ] = 0;
+    varname[end - start] = 0;
 
     return p;
 }
@@ -142,8 +142,8 @@ int substitute(char * src, char * dest, int len)   // TODO : size of dest ?
         else if(*sp == '$')
         {
             char * subst;
-            char varname[ 40 ];
-            char pid[ 5 ];   // for the pid in case of $$
+            char varname[40];
+            char pid[5];   // for the pid in case of $$
 
             sp++;   // ignore '$'
 
@@ -162,7 +162,7 @@ int substitute(char * src, char * dest, int len)   // TODO : size of dest ?
                 if(sp == NULL)
                 {
                     // parse error: don't process further
-                    *dp = 0; // properly terminate the string
+                    *dp = 0;   // properly terminate the string
                     return SUBST_PARSE_ERROR;
                 }
 

@@ -57,15 +57,18 @@
  */
 
 /* a real shell */
-int main(int argc, char *argv[ ])
+int main(int argc, char *argv[])
 {
     char *prompt;
     int pid;
     TOKEN term;
 
-    if(!EVinit()) fatal("fatal: can't initialise environment. Too much environment variables?" __FILE__);
-    if((prompt = EVget("PS2")) == NULL) prompt = "~> ";
+    if(!EVinit())
+        fatal("fatal: can't initialise environment. Too much environment variables?" __FILE__);
+
     printf("Welcome! Type 'tips' to display a list of quick tips, 'exit' to quit the shell.\n");
+
+    if((prompt = EVget("PS2")) == NULL) prompt = "~> ";
     printf("%s", prompt);
 
     while(1)
@@ -88,18 +91,19 @@ void close_all_files(int sfd)
 }
 
 /* assignment command */
-void asg(int argc, char *argv[ ], BOOLEAN export)
+void asg(int argc, char *argv[], BOOLEAN export)
 {
     char *name, *val;
 
     if(argc != 1) printf("error: extra arguments.\n");
     else
     {
-        name = strtok(argv[ 0 ], "=");
+        name = strtok(argv[0], "=");
         val = strtok( NULL, "\1"); /* get all that's left */
         if(name == NULL || val == NULL)
         {
-            fprintf(stderr, "assignment error: unexpected format [%s]. Usage: varname=value.\n", argv[0]);
+            fprintf(stderr, "assignment error: unexpected format [%s]. Usage: varname=value.\n",
+                    argv[0]);
         }
         else if(EVset(name, val))
         {
@@ -113,25 +117,25 @@ void asg(int argc, char *argv[ ], BOOLEAN export)
 }
 
 /* environment variable export command */
-void vexport(int argc, char *argv[ ])
+void vexport(int argc, char *argv[])
 {
     int i;
 
-    if(argc == 1 && !strchr(argv[ 0 ], '='))
+    if(argc == 1 && !strchr(argv[0], '='))
     {
         set(argc, argv);
         return;
     }
     for(i = 1; i < argc; i++)
     {
-        if(strchr(argv[ i ], '='))
+        if(strchr(argv[i], '='))
         {
             // assign and export
-            asg(1, &argv[ i ], TRUE);
+            asg(1, &argv[i], TRUE);
         }
-        else if(!EVexport(argv[ i ]))
+        else if(!EVexport(argv[i]))
         {
-            printf("Can't export %s\n", argv[ i ]);
+            printf("Can't export %s\n", argv[i]);
             return;
         }
     }
@@ -139,7 +143,7 @@ void vexport(int argc, char *argv[ ])
 }
 
 /* set command */
-void set(int argc, char *argv[ ])
+void set(int argc, char *argv[])
 {
     if(argc != 1) printf("error: extra arguments.\n");
     else EVprint();
@@ -148,7 +152,7 @@ void set(int argc, char *argv[ ])
 // -----------------------------------------
 
 /* invoke a simple command */
-int invoke(int argc, char *argv[ ], int srcfd, char * srcfile, int dstfd, char * dstfile,
+int invoke(int argc, char *argv[], int srcfd, char * srcfile, int dstfd, char * dstfile,
         BOOLEAN append, BOOLEAN bckgrnd)
 {
     if(argc == 0 || builtin(argc, argv, srcfd, srcfile, dstfd, dstfile, append, bckgrnd)) return 0;
@@ -173,9 +177,9 @@ int invoke(int argc, char *argv[ ], int srcfd, char * srcfile, int dstfd, char *
         close_all_files(3);
 
         // launch process
-        execvp(argv[ 0 ], argv);
+        execvp(argv[0], argv);
 
-        fprintf(stderr, "Unknown command: [%s].\n", argv[ 0 ]);
+        fprintf(stderr, "Unknown command: [%s].\n", argv[0]);
         EVfree();   // properly clean up
         exit(EXIT_FAILURE);
     }
@@ -282,21 +286,21 @@ void print_quicktips()
  */
 E_builtin_cmd is_builtin(char * cmd)
 {
-    if(strchr(cmd, '=') != NULL)    return BUILTIN_ASSIGN;
-    if(strcmp(cmd, "export") == 0)  return BUILTIN_EXPORT;
-    if(strcmp(cmd, "set") == 0)     return BUILTIN_SET;
-    if(strcmp(cmd, "cd") == 0)      return BUILTIN_CD;
+    if(strchr(cmd, '=') != NULL) return BUILTIN_ASSIGN;
+    if(strcmp(cmd, "export") == 0) return BUILTIN_EXPORT;
+    if(strcmp(cmd, "set") == 0) return BUILTIN_SET;
+    if(strcmp(cmd, "cd") == 0) return BUILTIN_CD;
     if(strcmp(cmd, "history") == 0) return BUILTIN_HISTORY;
-    if(strcmp(cmd, "tips") == 0)    return BUILTIN_QUICKTIPS;
-    if(strcmp(cmd, "exit") == 0)    return BUILTIN_EXIT;
+    if(strcmp(cmd, "tips") == 0) return BUILTIN_QUICKTIPS;
+    if(strcmp(cmd, "exit") == 0) return BUILTIN_EXIT;
     return BUILTIN_NONE;
 }
 
 /* execute a built-in command */
-BOOLEAN builtin(int argc, char *argv[ ], int srcfd, char *srcfile, int dstfd, char * dstfile,
+BOOLEAN builtin(int argc, char *argv[], int srcfd, char *srcfile, int dstfd, char * dstfile,
         BOOLEAN append, BOOLEAN bckgrnd)
 {
-    E_builtin_cmd cmd = is_builtin(argv[ 0 ]);
+    E_builtin_cmd cmd = is_builtin(argv[0]);
 
     if(cmd == BUILTIN_NONE) return FALSE;   // not a builtin
     if(cmd == BUILTIN_EXIT)

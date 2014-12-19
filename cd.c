@@ -4,14 +4,18 @@
  * @date 2 Dec 2014
  * @author Lucy Linder <lucy.derlin@gmail.com>
  *
- * PURPOSE:
+ * PURPOSE
+ * =======
+ *
  * this file implements the cd function. It supports absolute and relative
  * paths, as well as cd - (back to previous directory) and the ~ (shortcut for
  * user home directory).
  *
- * NOTES:
- * i decided to return an error when cd is called without arguments. Another
- * possibility would have been to use the default value "user_home" (as in zsh).
+ * NOTES
+ * =====
+ * I decided to return an error when cd is called without arguments. Another
+ * possibility would be to use the default value "user_home" (as in bash/zsh).
+ *
  */
 #include <stdlib.h>
 #include <stdio.h>
@@ -26,12 +30,12 @@
 
 /**
  * recode the get_current_dir_name from unistd, since the latter
- * gives compile errors (implicit declaration (??) )
+ * gives compile warnings (implicit declaration (??) )
  * @return the current working directory, as a [mallocated] string
  */
 char * current_dir_name()
 {
-    char buff[ 1024 ], *cwd = NULL;
+    char buff[1024], *cwd = NULL;
     if(getcwd(buff, sizeof(buff)) != NULL &&   //
             (cwd = (char*) malloc(strlen(buff) + 1)) != NULL)
     {
@@ -52,41 +56,41 @@ void update_cwd(char * npwd)
     {
         // update environment variables
         char * pwd;
-        pwd = EVget( PWD);
-        int ok = EVset( OLDPWD, pwd);
+        pwd = EVget(PWD);
+        int ok = EVset(OLDPWD, pwd);
 
         npwd = current_dir_name();   // get absolute path
-        ok &= EVset( PWD, npwd);
+        ok &= EVset(PWD, npwd);
         free(npwd);
 
-        if(ok) printf("  CWD: %s\n", EVget( PWD));   // feedback
+        if(ok) printf("  CWD: %s\n", EVget(PWD));   // feedback
     }
     else   // change dir failed
     {
-        fprintf( stderr, "cd: no such file or directory '%s'\n", npwd);
+        fprintf(stderr, "cd: no such file or directory '%s'\n", npwd);
     }
 }
 
 // --------------------------------------------------
 
-void cd(int argc, char * argv[ ])
+void cd(int argc, char * argv[])
 {
     if(argc != 2)   // not exactly one argument, print usage
     {
-        fprintf( stderr, "usage: cd [dir]\n");
+        fprintf(stderr, "usage: cd [dir]\n");
         return;
     }
 
-    char * arg = argv[ 1 ];
+    char * arg = argv[1];
 
     if(strcmp(arg, "-") == 0)   // back to OLDPWD
     {
         update_cwd(EVget(OLDPWD));
     }
-    else if(arg[ 0 ] == '~')   // replace ~ with user_home
+    else if(arg[0] == '~')   // replace ~ with user_home
     {
-        char * home = EVget( HOME_DIR);
-        char buff[ 1024 ];
+        char * home = EVget(HOME_DIR);
+        char buff[1024];
 
         strncpy(buff, home, 1024);
         strncpy(buff + strlen(home), arg + 1, 1024);
