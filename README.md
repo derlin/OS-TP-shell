@@ -25,8 +25,6 @@ A skeleton is provided. Students have to:
 
 I added a comment at the top of each created/modified file, which explains the purpose, modifications, todos and/or bugs that could persist. Please, refer to them if you have a doubt.
 
-I also decided to include the git repository into the archive, in case you want to have a look at the previous versions (we never know ;)). If this bother you, feel free to remove it (rm -rf .git*).
-
 The makefile provided two commands: all and clean.
 The .o and .d are created in the bin/ directory. If you run it on different systems, don't forget to make clean before trying to compile again.
 
