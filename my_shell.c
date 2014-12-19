@@ -28,20 +28,32 @@
  *  - fix bug when assigning variables:
  *      before, only "export a" was allowed. Defining + exporting at once
  *      (export a=toto) resulted in a variable named a=toto with an empty
- *      value...
+ *      value (a=toto=)...
  *      Now, assign + export supported !
  *
+ *  - fix bug in asg:
  *
+ *      > =hello
+ *      [3] 21601 segmentation fault (core dumped)  ./my_shell
+ *
+ *    To avoid that, check for NULL pointer before calling EVset!
+ *
+ *  - properly free the environ when an exec fails (cleaner).
  *
  * TODO
  * ====
- *  - currently, typing:
- *      > grep B
- *    would block the shell. I would be nice that the ctrl+c signal would not exit the shell,
- *    but kill the current subprocess instead.
- *
+ *  - make the ctrl+c signal not exit the shell, but kill the current subprocess instead.
  *  - add support for unset varname
+ *      cat file.txt | sed 's/^.*$/#/'
+ *    will not work, since $ must be escaped. Use instead:
+ *      cat file.txt | sed 's/^.*\$/#/'
  *
+ * NOTES
+ * =====
+ *
+ * - some commands may have a modified syntax. For example:
+ * - it would be nice to have a "help" method, with infos about
+ *   variables and such.
  */
 
 /* a real shell */
@@ -51,8 +63,9 @@ int main(int argc, char *argv[ ])
     int pid;
     TOKEN term;
 
-    if(!EVinit()) fatal("can't initialize environment in main(), " __FILE__);
-    if((prompt = EVget("PS2")) == NULL) prompt = "fmk-> ";
+    if(!EVinit()) fatal("fatal: can't initialise environment. Too much environment variables?" __FILE__);
+    if((prompt = EVget("PS2")) == NULL) prompt = "~> ";
+    printf("Welcome! Type 'tips' to display a list of quick tips, 'exit' to quit the shell.\n");
     printf("%s", prompt);
 
     while(1)
@@ -79,18 +92,22 @@ void asg(int argc, char *argv[ ], BOOLEAN export)
 {
     char *name, *val;
 
-    if(argc != 1) printf("Extra args\n");
+    if(argc != 1) printf("error: extra arguments.\n");
     else
     {
         name = strtok(argv[ 0 ], "=");
         val = strtok( NULL, "\1"); /* get all that's left */
-        if(EVset(name, val))
+        if(name == NULL || val == NULL)
+        {
+            fprintf(stderr, "assignment error: unexpected format [%s]. Usage: varname=value.\n", argv[0]);
+        }
+        else if(EVset(name, val))
         {
             if(export) EVexport(name);
         }
         else
         {
-            printf("Can't assign\n");
+            fprintf(stderr, "error: can't assign variable [%s].\n", name);
         }
     }
 }
@@ -124,7 +141,7 @@ void vexport(int argc, char *argv[ ])
 /* set command */
 void set(int argc, char *argv[ ])
 {
-    if(argc != 1) printf("Extra args\n");
+    if(argc != 1) printf("error: extra arguments.\n");
     else EVprint();
 }
 
@@ -136,26 +153,31 @@ int invoke(int argc, char *argv[ ], int srcfd, char * srcfile, int dstfd, char *
 {
     if(argc == 0 || builtin(argc, argv, srcfd, srcfile, dstfd, dstfile, append, bckgrnd)) return 0;
 
-    // export var
-    EVupdate();
-
     pid_t pid = fork();
 
     if(pid < 0)
     {
         /* error */
-        fprintf( stderr, "fork failed\n");
+        fprintf( stderr, "Error in invoke: fork failed.\n");
         return -1;
     }
     else if(pid == 0)
     {
         /* child */
+
+        // export var
+        EVupdate();
+
+        // do redirect
         redirect(srcfd, srcfile, dstfd, dstfile, append, bckgrnd);
         close_all_files(3);
+
+        // launch process
         execvp(argv[ 0 ], argv);
 
-        fprintf( stderr, "Execution failed: [%s]\n", argv[ 0 ]);
-        exit( EXIT_FAILURE);
+        fprintf(stderr, "Unknown command: [%s].\n", argv[ 0 ]);
+        EVfree();   // properly clean up
+        exit(EXIT_FAILURE);
     }
     else
     {
@@ -181,10 +203,10 @@ void redirect(int srcfd, char *srcfile, int dstfd, char * dstfile, BOOLEAN appen
     if(srcfd != 0)
     {
         // since we close stdin, the next fd will necessary be placed at index 0 !
-        if(close(0) == -1) syserr("closing srcfd in redirect()" __FILE__);
+        if(close(0) == -1) syserr("error: closing srcfd in redirect()" __FILE__);
         if(srcfd > 0)
         {
-            if(dup(srcfd) != 0) fatal("can't dup srcfd in redirect()" __FILE__);
+            if(dup(srcfd) != 0) fatal("fatal error: can't dup srcfd in redirect()" __FILE__);
         }
         else if(open(srcfile, O_RDONLY, 0) == -1)
         {
@@ -195,10 +217,10 @@ void redirect(int srcfd, char *srcfile, int dstfd, char * dstfile, BOOLEAN appen
     if(dstfd != 1)
     {
         // since we close stdout, the next fd will necessary be placed at index 1 !
-        if(close(1) == -1) syserr("closing dstfd in redirect(), " __FILE__);
+        if(close(1) == -1) syserr("error: closing dstfd in redirect(), " __FILE__);
         if(dstfd > 1)
         {
-            if(dup(dstfd) != 1) fatal("can't dup dstfd in redirect(), " __FILE__);
+            if(dup(dstfd) != 1) fatal("fatal error: can't dup dstfd in redirect(), " __FILE__);
         }
         else
         {
@@ -238,9 +260,20 @@ typedef enum
     BUILTIN_EXPORT,
     BUILTIN_SET,
     BUILTIN_HISTORY,
+    BUILTIN_QUICKTIPS,
     BUILTIN_EXIT
 } E_builtin_cmd;
 
+void print_quicktips()
+{
+    printf("Some quick tips:\n");
+    printf(" - use double-quotes to delimit arguments with spaces,\n");
+    printf(" - everything prefixed with $ is considered a variable and will be expanded.\n");
+    printf(" - an undefined variable is expanded with ''.\n");
+    printf(" - escape the $ with \\ to avoid variable expansion.\n");
+    printf(" - enter ctrl+D to stop a subprocess waiting for input.\n");
+    printf(" - builtins: set, export, [varname]=[value], cd, history, h[1-10], tips, exit\n");
+}
 /*
  * this function allows us to check if the command is a built-in one before actually
  * making the builtin call. It simply returns the type of command to execute.
@@ -249,12 +282,13 @@ typedef enum
  */
 E_builtin_cmd is_builtin(char * cmd)
 {
-    if(strchr(cmd, '=') != NULL) return BUILTIN_ASSIGN;
-    if(strcmp(cmd, "export") == 0) return BUILTIN_EXPORT;
-    if(strcmp(cmd, "set") == 0) return BUILTIN_SET;
-    if(strcmp(cmd, "cd") == 0) return BUILTIN_CD;
+    if(strchr(cmd, '=') != NULL)    return BUILTIN_ASSIGN;
+    if(strcmp(cmd, "export") == 0)  return BUILTIN_EXPORT;
+    if(strcmp(cmd, "set") == 0)     return BUILTIN_SET;
+    if(strcmp(cmd, "cd") == 0)      return BUILTIN_CD;
     if(strcmp(cmd, "history") == 0) return BUILTIN_HISTORY;
-    if(strcmp(cmd, "exit") == 0) return BUILTIN_EXIT;
+    if(strcmp(cmd, "tips") == 0)    return BUILTIN_QUICKTIPS;
+    if(strcmp(cmd, "exit") == 0)    return BUILTIN_EXIT;
     return BUILTIN_NONE;
 }
 
@@ -264,8 +298,12 @@ BOOLEAN builtin(int argc, char *argv[ ], int srcfd, char *srcfile, int dstfd, ch
 {
     E_builtin_cmd cmd = is_builtin(argv[ 0 ]);
 
-    if(cmd == BUILTIN_NONE) return FALSE; // not a builtin
-    if(cmd == BUILTIN_EXIT) exit(0);
+    if(cmd == BUILTIN_NONE) return FALSE;   // not a builtin
+    if(cmd == BUILTIN_EXIT)
+    {
+        printf("See you soon!\n");
+        exit(0);
+    }
 
     // setup redirect
     int stdout_bk = -1;
@@ -295,8 +333,16 @@ BOOLEAN builtin(int argc, char *argv[ ], int srcfd, char *srcfile, int dstfd, ch
         case BUILTIN_SET:
             set(argc, argv);
             break;
+
         case BUILTIN_HISTORY:
             print_history();
+            break;
+
+        case BUILTIN_QUICKTIPS:
+            print_quicktips();
+            break;
+
+        default:   // should never happen, but avoids compiler warnings
             break;
     }
 
@@ -305,7 +351,7 @@ BOOLEAN builtin(int argc, char *argv[ ], int srcfd, char *srcfile, int dstfd, ch
     {
         fflush( stdout);
 
-        if(stdout_bk > 0) // we are never too careful
+        if(stdout_bk > 0)   // we are never too careful
         {
             dup2(stdout_bk, STDOUT_FILENO);
             close(stdout_bk);

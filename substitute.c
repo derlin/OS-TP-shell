@@ -9,6 +9,7 @@
  *
  * FUNCTIONALITIES
  * ===============
+ *
  *  a variable is either $varname or ${varname}. The special $$ is expanded with
  *  the current shell process id.
  *  To escape a variable, use \$. Note that the '\' escape char is always stripped from the input.
@@ -38,6 +39,11 @@
  *          > echo 'lala\ '
  *      will result in:
  *          lala\
+ *
+ *  -   the code is written to be generic: it can also be used directly from the preproc (what we did in a
+ *      previous version), with the whole input string.
+ *      This is why the method is "verbose": it cannot rely on the parser to strip spaces and
+ *      split arguments...
  *
  */
 
@@ -84,7 +90,7 @@ char * extractVar(char * src, char * p, char * varname)
 
     if(bracket && *p != '}')
     {
-        fprintf( stderr, "parse error, unbalanced '}'.\n");
+        fprintf( stderr, "parse error: unbalanced '}'.\n");
         return NULL;
     }
 
@@ -92,7 +98,7 @@ char * extractVar(char * src, char * p, char * varname)
 
     if(end-start >= MAX_VARNAME_LEN)
     {
-        fprintf(stderr, "error, variable name too long.\n");
+        fprintf(stderr, "error: variable name too long.\n");
         return NULL;
     }
 
@@ -121,7 +127,7 @@ int substitute(char * src, char * dest, int len)   // TODO : size of dest ?
         /* avoid buffer overflows */
         if(dp - dest >= len)
         {
-            fprintf(stderr, "out of memory error: expansion too long.\n");
+            fprintf(stderr, "error: out of memory, expansion too long.\n");
             return SUBST_OUT_OF_MEM;
         }
 

@@ -49,6 +49,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <assert.h>
 
 #define IncModulo(x)    ((x+1)%HSIZE)
 #define DecModulo(x)    ((x+HSIZE-1)%HSIZE)
@@ -66,6 +67,16 @@ BOOLEAN subst_history( char * src, char * dest );
 static char cur_cmd[ MAX_CMD ] = { 0 };
 static int cur_index = 0;
 
+
+inline void reset_cmd()
+{
+    int i = 0;
+    for(; i < MAX_CMD; i++)
+    {
+        cur_cmd[i] = 0;
+    }
+}
+
 /**
  * @return the next available char
  */
@@ -76,7 +87,8 @@ char get_char()
     if( ret == 0 ) // get new input
     {
         int i = 0;
-        char temp[ MAX_CMD ];
+        reset_cmd();
+        char temp[ MAX_CMD ] = {0}; // init not mandatory, but we never know
 
         while( 1 )
         {
@@ -117,13 +129,15 @@ char get_char()
     return ret;
 }
 
+
 /**
  * undo a get_char
  * @param c the char to put back (unused).
  */
 void un_getc( char c )
 {
-    cur_index--;
+    assert(cur_index >= 1);
+    cur_cmd[--cur_index] = c;
 }
 //--------------------------------------------------------
 
