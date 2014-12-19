@@ -43,6 +43,7 @@
  * TODO
  * ====
  *  - make the ctrl+c signal not exit the shell, but kill the current subprocess instead.
+ *
  *  - add support for unset varname
  *      cat file.txt | sed 's/^.*$/#/'
  *    will not work, since $ must be escaped. Use instead:
