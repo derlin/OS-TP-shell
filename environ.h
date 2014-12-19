@@ -8,6 +8,7 @@
    char *  EVget(char *name);               /* get value of variable */
    BOOLEAN EVinit();                        /* initialize symbol table from environment */
    BOOLEAN EVupdate();                      /* build environment from symbol table */
+   void EVfree();                           /* free the environ in case of exec failure */
    void    EVprint();                       /* print environment */
 
 #endif

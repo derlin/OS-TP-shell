@@ -6,6 +6,7 @@
  * MODIFICATIONS:
  *  - increase MAXVAR, since in a real unix system we can easily have more than 100
  *    env variables (in my computer: 108...)
+ *  - add a free method in case the invoke/exec fails. This avoids memory leaks.
  */
 
 
@@ -130,6 +131,18 @@ BOOLEAN EVupdate() {
    environ[envi] = NULL;
    updated = TRUE;
    return(TRUE);
+}
+
+/* free the environ */
+void EVfree(){
+    if(environ != NULL){
+        int i = 0;
+        while(environ[i] != NULL)
+        {
+            free(environ[i++]);
+        }
+        free(environ);
+    }
 }
 
 /* print environment */
